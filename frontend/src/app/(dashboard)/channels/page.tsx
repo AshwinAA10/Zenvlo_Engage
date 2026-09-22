@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -11,15 +11,15 @@ export default function ChannelsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">Connected Channels</h1>
-          <p className="mt-1 text-sm text-[#A1A1AA]">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Connected Channels</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Integrate WhatsApp Cloud API (WABA) and Instagram Graph API
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-[#27272a] bg-[#09090b]">
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -35,7 +35,7 @@ export default function ChannelsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-xs text-[#A1A1AA] leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Connect your verified Meta Business Manager account to send interactive messages,
               receive high-volume webhooks, and trigger automatic responses.
             </p>
@@ -50,7 +50,7 @@ export default function ChannelsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-[#27272a] bg-[#09090b]">
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -66,7 +66,7 @@ export default function ChannelsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-xs text-[#A1A1AA] leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Integrate Instagram Professional Accounts to automate DM responses, comment triggers,
               and lead capture directly inside your unified inbox.
             </p>

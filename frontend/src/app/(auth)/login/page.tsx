@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -72,21 +72,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-12 text-[#F8FAFC]">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12 text-foreground">
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center text-center">
           <Link href="/" className="mb-4">
             <ZenvloLogo />
           </Link>
-          <h2 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
             Sign in to Engage Console
           </h2>
-          <p className="mt-2 text-sm text-[#A1A1AA]">
+          <p className="mt-2 text-sm text-muted-foreground">
             Enter your credentials to manage conversations & automation
           </p>
         </div>
 
-        <Card className="border-[#27272a] bg-[#09090b]">
+        <Card>
           <form onSubmit={handleSubmit(onSubmit)}>
             <CardHeader>
               <CardTitle className="text-base">Account Login</CardTitle>
@@ -97,7 +97,7 @@ export default function LoginPage() {
 
             <CardContent className="space-y-4">
               {serverError && (
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{serverError}</span>
                 </div>
@@ -111,7 +111,7 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#A1A1AA]">Email Address</label>
+                <label className="text-xs font-semibold text-muted-foreground">Email Address</label>
                 <Input
                   type="email"
                   placeholder="admin@zenvlo.com"
@@ -120,13 +120,13 @@ export default function LoginPage() {
                   {...register('email')}
                 />
                 {errors.email && (
-                  <p className="text-xs text-red-400 mt-1">{errors.email.message}</p>
+                  <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
                 )}
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-[#A1A1AA]">Password</label>
+                  <label className="text-xs font-semibold text-muted-foreground">Password</label>
                 </div>
                 <Input
                   type="password"
@@ -136,7 +136,7 @@ export default function LoginPage() {
                   {...register('password')}
                 />
                 {errors.password && (
-                  <p className="text-xs text-red-400 mt-1">{errors.password.message}</p>
+                  <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>
                 )}
               </div>
             </CardContent>
@@ -157,7 +157,7 @@ export default function LoginPage() {
                 )}
               </Button>
 
-              <div className="text-center text-xs text-[#A1A1AA]">
+              <div className="text-center text-xs text-muted-foreground">
                 Multi-tenant credentials mapped to verified workspace ID
               </div>
             </CardFooter>

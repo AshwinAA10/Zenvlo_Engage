@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,17 +9,27 @@ import { Building, Shield } from 'lucide-react';
 
 export default function SettingsPage() {
   const { currentWorkspaceId } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const displayedWorkspaceId =
+    mounted && currentWorkspaceId
+      ? currentWorkspaceId
+      : '00000000-0000-0000-0000-000000000000';
 
   return (
     <div className="space-y-8 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">Settings</h1>
-        <p className="mt-1 text-sm text-[#A1A1AA]">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage multi-tenant workspace credentials, API access tokens, and security
         </p>
       </div>
 
-      <Card className="border-[#27272a] bg-[#09090b]">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Building className="w-4 h-4 text-[#10B981]" /> Workspace Configuration
@@ -30,22 +40,22 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#A1A1AA]">Active Workspace ID</label>
+            <label className="text-xs font-semibold text-muted-foreground">Active Workspace ID</label>
             <Input
-              value={currentWorkspaceId || '00000000-0000-0000-0000-000000000000'}
+              value={displayedWorkspaceId}
               readOnly
-              className="font-mono text-xs bg-[#18181b]"
+              className="font-mono text-xs bg-muted"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#A1A1AA]">Workspace Name</label>
+            <label className="text-xs font-semibold text-muted-foreground">Workspace Name</label>
             <Input defaultValue="Production Workspace" />
           </div>
           <Button size="sm">Save Changes</Button>
         </CardContent>
       </Card>
 
-      <Card className="border-[#27272a] bg-[#09090b]">
+      <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Shield className="w-4 h-4 text-[#10B981]" /> Tenant Security & Audit Policies
@@ -54,12 +64,12 @@ export default function SettingsPage() {
             Audit logging active with TimescaleDB hypertable partitioning
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3 text-xs text-[#A1A1AA]">
-          <div className="flex items-center justify-between py-2 border-b border-[#27272a]">
+        <CardContent className="space-y-3 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between py-2 border-b border-border">
             <span>Request-scoped Tenant Propagation</span>
             <span className="text-[#10B981] font-semibold">Enforced (nestjs-cls)</span>
           </div>
-          <div className="flex items-center justify-between py-2 border-b border-[#27272a]">
+          <div className="flex items-center justify-between py-2 border-b border-border">
             <span>Active Record Entity Inheritance</span>
             <span className="text-[#10B981] font-semibold">TenantBaseEntity</span>
           </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 
@@ -21,7 +21,7 @@ export function ZenvloLogo({ collapsed = false, className = '' }: ZenvloLogoProp
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="w-8 h-8 rounded-lg bg-[#09090b] border border-[#27272a] flex items-center justify-center shadow-[0_2px_10px_rgba(16,185,129,0.2)]">
+          <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center shadow-[0_2px_10px_rgba(16,185,129,0.2)]">
             <svg
               className="w-5 h-5 text-[#10B981]"
               viewBox="0 0 24 24"
@@ -50,7 +50,7 @@ export function ZenvloLogo({ collapsed = false, className = '' }: ZenvloLogoProp
         />
       ) : (
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#09090b] border border-[#27272a] flex items-center justify-center shadow-[0_2px_12px_rgba(16,185,129,0.25)]">
+          <div className="w-8 h-8 rounded-xl bg-card border border-border flex items-center justify-center shadow-[0_2px_12px_rgba(16,185,129,0.25)]">
             <svg
               className="w-5 h-5 text-[#10B981]"
               viewBox="0 0 24 24"
@@ -65,12 +65,12 @@ export function ZenvloLogo({ collapsed = false, className = '' }: ZenvloLogoProp
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-base tracking-tight text-[#F8FAFC]">ZENVLO</span>
+              <span className="font-bold text-base tracking-tight text-foreground">ZENVLO</span>
               <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[#10B981]/30">
                 Engage
               </span>
             </div>
-            <span className="text-[10px] text-[#A1A1AA] tracking-wider uppercase font-medium">
+            <span className="text-[10px] text-muted-foreground tracking-wider uppercase font-medium">
               Automation Cloud
             </span>
           </div>

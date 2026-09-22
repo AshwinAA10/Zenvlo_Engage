@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { Card, CardTitle, CardContent } from '@/components/ui/card';
@@ -13,8 +13,8 @@ export default function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#F8FAFC]">Broadcast Campaigns</h1>
-          <p className="mt-1 text-sm text-[#A1A1AA]">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Broadcast Campaigns</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Launch targeted WhatsApp & Instagram broadcast campaigns at scale
           </p>
         </div>
@@ -25,19 +25,19 @@ export default function CampaignsPage() {
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#A1A1AA]" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search campaigns..." className="pl-9" />
         </div>
       </div>
 
       {campaigns.length === 0 ? (
-        <Card className="border-[#27272a] bg-[#09090b] text-center py-16">
+        <Card className="text-center py-16">
           <CardContent className="flex flex-col items-center justify-center max-w-md mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-[#18181b] border border-[#27272a] flex items-center justify-center text-[#10B981] mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-[#10B981] mb-4">
               <Send className="w-6 h-6" />
             </div>
             <CardTitle className="text-lg">No Campaigns Yet</CardTitle>
-            <p className="text-sm text-[#A1A1AA] mt-2 leading-relaxed">
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
               Create your first scheduled or instant broadcast campaign to reach contacts
               with pre-approved WhatsApp templates and interactive messages.
             </p>

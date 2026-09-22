@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -15,26 +15,19 @@ import {
   Settings,
   Menu,
   X,
-  ChevronLeft,
-  ChevronRight,
   Sun,
   Moon,
-  Building,
   LogOut,
+  ChevronLeft,
+  ChevronRight,
   Bell,
+  Building,
 } from 'lucide-react';
-import { ZenvloLogo } from './ZenvloLogo';
-import { Avatar, AvatarFallback } from './ui/avatar';
-import { useAuthStore } from '../stores/authStore';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useAuthStore } from '@/stores/authStore';
+import { ZenvloLogo } from '@/components/ZenvloLogo';
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-  badge?: string;
-}
-
-const navItems: NavItem[] = [
+const navItems = [
   { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Chats', href: '/chats', icon: MessageSquare, badge: '3' },
   { label: 'Campaigns', href: '/campaigns', icon: Send },
@@ -48,55 +41,74 @@ const navItems: NavItem[] = [
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const { user, currentWorkspaceId, logout } = useAuthStore();
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const currentTheme = mounted ? (resolvedTheme || theme) : 'dark';
+  const displayedWorkspaceId =
+    mounted && currentWorkspaceId
+      ? currentWorkspaceId.slice(0, 8) + '...'
+      : 'Default';
+  const displayedEmail =
+    mounted && user?.email
+      ? user.email
+      : 'admin@zenvlo.com';
+  const displayedInitials =
+    mounted && user?.email
+      ? user.email.slice(0, 2).toUpperCase()
+      : 'ZE';
+
   return (
-    <div className="flex min-h-screen bg-black text-[#F8FAFC]">
+    <div className="flex min-h-screen bg-background text-foreground">
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[#27272a] bg-[#000000] transition-all duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-card transition-all duration-300 ${
           collapsed ? 'w-20' : 'w-64'
         } ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
-        <div className="flex h-16 items-center justify-between px-4 border-b border-[#27272a]">
+        <div className="flex h-16 items-center justify-between px-4 border-b border-border">
           <Link href="/dashboard" className="flex items-center overflow-hidden">
             <ZenvloLogo collapsed={collapsed} />
           </Link>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg border border-[#27272a] bg-[#09090b] text-[#A1A1AA] hover:text-[#F8FAFC] hover:border-[#3f3f46] transition-colors"
+            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg border border-border bg-muted text-muted-foreground hover:text-foreground hover:border-border transition-colors"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setMobileOpen(false)}
-            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-[#A1A1AA] hover:text-[#F8FAFC]"
+            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {!collapsed && (
-          <div className="mx-3 my-3 p-2.5 rounded-xl bg-[#09090b] border border-[#27272a] flex items-center justify-between">
+          <div className="mx-3 my-3 p-2.5 rounded-xl bg-muted/60 border border-border flex items-center justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-8 h-8 rounded-lg bg-[rgba(16,185,129,0.15)] border border-[#10B981]/30 flex items-center justify-center text-[#10B981]">
                 <Building className="w-4 h-4" />
               </div>
               <div className="flex flex-col truncate">
-                <span className="text-xs font-semibold text-[#F8FAFC] truncate">
+                <span className="text-xs font-semibold text-foreground truncate">
                   Default Workspace
                 </span>
-                <span className="text-[10px] text-[#A1A1AA] font-mono truncate">
-                  {currentWorkspaceId ? currentWorkspaceId.slice(0, 8) + '...' : 'Default'}
+                <span className="text-[10px] text-muted-foreground font-mono truncate">
+                  {displayedWorkspaceId}
                 </span>
               </div>
             </div>
@@ -116,13 +128,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-[rgba(16,185,129,0.15)] text-[#10B981] border border-[#10B981]/30 font-semibold'
-                    : 'text-[#A1A1AA] hover:bg-[#09090b] hover:text-[#F8FAFC] border border-transparent'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
                 }`}
                 title={collapsed ? item.label : undefined}
               >
                 <Icon
                   className={`w-5 h-5 shrink-0 transition-colors ${
-                    isActive ? 'text-[#10B981]' : 'text-[#A1A1AA] group-hover:text-[#F8FAFC]'
+                    isActive ? 'text-[#10B981]' : 'text-muted-foreground group-hover:text-foreground'
                   }`}
                 />
                 {!collapsed && <span className="truncate">{item.label}</span>}
@@ -130,8 +142,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <span
                     className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold ${
                       isActive
-                        ? 'bg-[#10B981] text-black'
-                        : 'bg-[#18181b] text-[#10B981] border border-[#10B981]/20'
+                        ? 'bg-[#10B981] text-white'
+                        : 'bg-muted text-[#10B981] border border-[#10B981]/20'
                     }`}
                   >
                     {item.badge}
@@ -142,27 +154,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="border-t border-[#27272a] p-3">
+        <div className="border-t border-border p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 overflow-hidden">
               <Avatar className="w-8 h-8">
-                <AvatarFallback className="text-xs bg-[#18181b] text-[#10B981] font-bold">
-                  {user?.email ? user.email.slice(0, 2).toUpperCase() : 'ZE'}
+                <AvatarFallback className="text-xs bg-muted text-[#10B981] font-bold">
+                  {displayedInitials}
                 </AvatarFallback>
               </Avatar>
               {!collapsed && (
                 <div className="flex flex-col truncate">
-                  <span className="text-xs font-semibold text-[#F8FAFC] truncate">
-                    {user?.email || 'admin@zenvlo.com'}
+                  <span className="text-xs font-semibold text-foreground truncate">
+                    {displayedEmail}
                   </span>
-                  <span className="text-[10px] text-[#A1A1AA]">Admin</span>
+                  <span className="text-[10px] text-muted-foreground">Admin</span>
                 </div>
               )}
             </div>
             {!collapsed && (
               <button
                 onClick={logout}
-                className="p-1.5 rounded-lg text-[#A1A1AA] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />
@@ -177,35 +189,40 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           collapsed ? 'lg:pl-20' : 'lg:pl-64'
         }`}
       >
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#27272a] bg-black/80 px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 rounded-lg border border-[#27272a] bg-[#09090b] text-[#A1A1AA]"
+              className="lg:hidden p-2 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="hidden sm:flex items-center gap-2 text-xs text-[#A1A1AA]">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
               <span>Zenvlo Engage</span>
               <span>/</span>
-              <span className="text-[#F8FAFC] font-medium capitalize">
+              <span className="text-foreground font-medium capitalize">
                 {pathname.replace('/', '') || 'Overview'}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="relative p-2 rounded-xl border border-[#27272a] bg-[#09090b] text-[#A1A1AA] hover:text-[#F8FAFC] hover:border-[#3f3f46] transition-colors">
+            <button className="relative p-2 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:border-border transition-colors">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#10B981]" />
             </button>
 
             <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-xl border border-[#27272a] bg-[#09090b] text-[#A1A1AA] hover:text-[#F8FAFC] hover:border-[#3f3f46] transition-colors"
-              title="Toggle theme"
+              onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:border-border transition-colors cursor-pointer"
+              title={currentTheme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+              aria-label="Toggle theme"
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {mounted ? (
+                currentTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
+              ) : (
+                <Sun className="w-4 h-4" />
+              )}
             </button>
           </div>
         </header>
