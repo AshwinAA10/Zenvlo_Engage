@@ -14,19 +14,28 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 4000;
-  const corsOrigin = configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
+  const corsOrigin =
+    configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
 
   app.enableCors({
     origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-workspace-id', 'x-request-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-workspace-id',
+      'x-request-id',
+    ],
   });
 
   app.setGlobalPrefix('api');
 
-  const pinoLogger = app.get(PinoLogger);
+  // FIX: PinoLogger is a scoped provider.
+  // Use resolve() instead of get().
+  const pinoLogger = await app.resolve(PinoLogger);
   app.useGlobalFilters(new HttpExceptionFilter(pinoLogger));
+
   app.useGlobalPipes(new AppValidationPipe());
 
   const swaggerConfig = new DocumentBuilder()
@@ -36,10 +45,18 @@ async function bootstrap() {
     )
     .setVersion('1.0.0')
     .addBearerAuth()
-    .addApiKey({ type: 'apiKey', name: 'x-workspace-id', in: 'header' }, 'x-workspace-id')
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-workspace-id',
+        in: 'header',
+      },
+      'x-workspace-id',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
+
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
@@ -47,8 +64,14 @@ async function bootstrap() {
   });
 
   await app.listen(port);
-  logger.log(`Zenvlo Engage API is running on: http://localhost:${port}/api`);
-  logger.log(`OpenAPI Swagger documentation available at: http://localhost:${port}/api/docs`);
+
+  logger.log(
+    `Zenvlo Engage API is running on: http://localhost:${port}/api`,
+  );
+
+  logger.log(
+    `OpenAPI Swagger documentation available at: http://localhost:${port}/api/docs`,
+  );
 }
 
 bootstrap();
