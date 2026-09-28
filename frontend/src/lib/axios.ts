@@ -9,14 +9,10 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const { token, currentWorkspaceId } = useAuthStore.getState();
+  const { token } = useAuthStore.getState();
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  if (currentWorkspaceId) {
-    config.headers['x-workspace-id'] = currentWorkspaceId;
   }
 
   return config;

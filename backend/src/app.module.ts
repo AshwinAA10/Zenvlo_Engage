@@ -5,22 +5,15 @@ import { ClsModule } from 'nestjs-cls';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
-import { Request } from 'express';
 
 import { dataSourceOptions } from './database/data-source';
 import { TenantContextMiddleware } from './middleware/tenant-context.middleware';
 
 import { SystemModule } from './modules/System/System.module';
 import { UserModule } from './modules/User/User.module';
-import { TenantModule } from './modules/Tenant/Tenant.module';
+import { BusinessModule } from './modules/Business/Business.module';
 import { AuthModule } from './modules/Auth/Auth.module';
-import { QueueModule } from './modules/Queue/Queue.module';
-import { WebhookModule } from './modules/Webhook/Webhook.module';
-import { ChannelModule } from './modules/Channel/Channel.module';
-import { ContactModule } from './modules/Contact/Contact.module';
-import { ConversationModule } from './modules/Conversation/Conversation.module';
-import { CampaignModule } from './modules/Campaign/Campaign.module';
-import { WorkflowModule } from './modules/Workflow/Workflow.module';
+import { IntegrationModule } from './modules/Integration/Integration.module';
 
 @Module({
   imports: [
@@ -63,8 +56,8 @@ import { WorkflowModule } from './modules/Workflow/Workflow.module';
       middleware: {
         mount: true,
         generateId: true,
-        idGenerator: (req: Request) =>
-          (req.headers['x-request-id'] as string) || uuidv4(),
+        idGenerator: (req: any) =>
+          (req.headers && req.headers['x-request-id'] as string) || uuidv4(),
       },
     }),
 
@@ -85,15 +78,9 @@ import { WorkflowModule } from './modules/Workflow/Workflow.module';
 
     SystemModule,
     UserModule,
-    TenantModule,
+    BusinessModule,
     AuthModule,
-    QueueModule,
-    WebhookModule,
-    ChannelModule,
-    ContactModule,
-    ConversationModule,
-    CampaignModule,
-    WorkflowModule,
+    IntegrationModule,
   ],
 })
 export class AppModule implements NestModule {

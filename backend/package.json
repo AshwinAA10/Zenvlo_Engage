@@ -23,6 +23,7 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^9.0.1",
     "@nestjs/bullmq": "^10.2.3",
     "@nestjs/common": "^10.4.15",
     "@nestjs/config": "^3.3.0",
@@ -31,12 +32,14 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/platform-fastify": "^10.4.15",
     "@nestjs/swagger": "^8.1.1",
     "@nestjs/typeorm": "^10.0.2",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.34.10",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "fastify": "^4.28.1",
     "ioredis": "^5.4.2",
     "nestjs-cls": "^4.5.0",
     "nestjs-pino": "^4.2.0",

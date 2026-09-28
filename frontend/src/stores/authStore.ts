@@ -5,58 +5,66 @@ export interface UserProfile {
   email: string;
   first_name?: string | null;
   last_name?: string | null;
-  workspaces?: string[];
+}
+
+export interface BusinessProfile {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  logo_url?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  location?: string | null;
 }
 
 interface AuthState {
   token: string | null;
   user: UserProfile | null;
-  currentWorkspaceId: string | null;
+  business: BusinessProfile | null;
   isAuthenticated: boolean;
-  setAuth: (token: string, user: UserProfile, workspaceId?: string) => void;
-  setWorkspace: (workspaceId: string) => void;
+  setAuth: (token: string, user: UserProfile, business?: BusinessProfile | null) => void;
+  setBusiness: (business: BusinessProfile) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: typeof window !== 'undefined' ? localStorage.getItem('zenvlo_engage_token') : null,
   user: null,
-  currentWorkspaceId:
-    typeof window !== 'undefined'
-      ? localStorage.getItem('zenvlo_engage_workspace_id') || '00000000-0000-0000-0000-000000000000'
-      : null,
+  business: null,
   isAuthenticated: typeof window !== 'undefined' ? !!localStorage.getItem('zenvlo_engage_token') : false,
 
-  setAuth: (token: string, user: UserProfile, workspaceId?: string) => {
-    const wsId = workspaceId || (user.workspaces && user.workspaces[0]) || '00000000-0000-0000-0000-000000000000';
+  setAuth: (token: string, user: UserProfile, business?: BusinessProfile | null) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('zenvlo_engage_token', token);
-      localStorage.setItem('zenvlo_engage_workspace_id', wsId);
+      if (business) {
+        localStorage.setItem('zenvlo_engage_business', JSON.stringify(business));
+      }
     }
     set({
       token,
       user,
-      currentWorkspaceId: wsId,
+      business: business || null,
       isAuthenticated: true,
     });
   },
 
-  setWorkspace: (workspaceId: string) => {
+  setBusiness: (business: BusinessProfile) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('zenvlo_engage_workspace_id', workspaceId);
+      localStorage.setItem('zenvlo_engage_business', JSON.stringify(business));
     }
-    set({ currentWorkspaceId: workspaceId });
+    set({ business });
   },
 
   logout: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('zenvlo_engage_token');
-      localStorage.removeItem('zenvlo_engage_workspace_id');
+      localStorage.removeItem('zenvlo_engage_business');
     }
     set({
       token: null,
       user: null,
-      currentWorkspaceId: null,
+      business: null,
       isAuthenticated: false,
     });
   },

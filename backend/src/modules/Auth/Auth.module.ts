@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './services/auth.service';
 import { AuthController } from './controllers/auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { BusinessModule } from '../Business/Business.module';
 
 @Module({
   imports: [
@@ -15,12 +16,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       useFactory: (configService: ConfigService) => ({
         secret:
           configService.get<string>('JWT_SECRET') ||
-          'zenvlo_engage_dev_secret_key_change_in_production',
+          'super_secret_jwt_key_zenvlo_engage_production_change_me',
         signOptions: {
           expiresIn: configService.get<string>('JWT_EXPIRATION') || '3600s',
         },
       }),
     }),
+    BusinessModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

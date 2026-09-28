@@ -13,8 +13,16 @@ export abstract class BaseTable extends BaseEntity {
   id: string;
 
   @Index()
-  @Column({ type: 'uuid' })
-  workspace_id: string;
+  @Column({ name: 'business_id', type: 'uuid' })
+  business_id: string;
+
+  // Backward compatibility alias for workspace_id
+  get workspace_id(): string {
+    return this.business_id;
+  }
+  set workspace_id(val: string) {
+    this.business_id = val;
+  }
 
   @Column({ type: 'smallint', default: 1 })
   status: number;
