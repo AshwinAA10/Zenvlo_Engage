@@ -5,7 +5,6 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
 
 @Catch()
@@ -16,8 +15,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const response = ctx.getResponse<any>();
+    const request = ctx.getRequest<any>();
 
     const status =
       exception instanceof HttpException
@@ -39,20 +38,33 @@ export class HttpExceptionFilter implements ExceptionFilter {
         errorDetails = (exceptionResponse as any).errors || null;
       }
     } else if (exception instanceof Error) {
-      this.logger.error({
-        err: exception.message,
-        stack: exception.stack,
-        url: request.url,
-        method: request.method,
-      }, 'Unhandled exception caught');
+      this.logger.error(
+        {
+          err: exception.message,
+          stack: exception.stack,
+          url: request.url,
+          method: request.method,
+        },
+        'Unhandled exception caught',
+      );
     }
 
-    response.status(status).json({
+    const payload = {
       statusCode: status,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: request.url || request.raw?.url,
       message,
       ...(errorDetails ? { errors: errorDetails } : {}),
-    });
+    };
+
+    if (typeof response.status === 'function') {
+      response.status(status);
+    }
+
+    if (typeof response.send === 'function') {
+      response.send(payload);
+    } else if (typeof response.json === 'function') {
+      response.json(payload);
+    }
   }
 }

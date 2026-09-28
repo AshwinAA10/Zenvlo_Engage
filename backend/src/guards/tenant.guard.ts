@@ -2,11 +2,10 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
-import { HEADER_WORKSPACE_ID, CLS_WORKSPACE_ID, CLS_USER_ID } from '../common/constants';
+import { CLS_WORKSPACE_ID, CLS_USER_ID } from '../common/constants';
 
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -15,28 +14,24 @@ export class TenantGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    const workspaceId = request.headers[HEADER_WORKSPACE_ID] as string;
 
-    if (!workspaceId) {
-      throw new BadRequestException(
-        `Missing required multi-tenant header: '${HEADER_WORKSPACE_ID}'`,
+    if (!user || !user.id) {
+      throw new ForbiddenException('Unauthenticated request cannot access tenant data');
+    }
+
+    const businessId = user.business_id;
+    if (!businessId) {
+      throw new ForbiddenException(
+        'User has not completed business onboarding. Complete onboarding to access this resource.',
       );
     }
 
-    if (user && user.workspaces && Array.isArray(user.workspaces)) {
-      const hasAccess = user.workspaces.some(
-        (wsId: string) => wsId === workspaceId,
-      );
-      if (!hasAccess) {
-        throw new ForbiddenException(
-          `User does not have authorization for workspace '${workspaceId}'`,
-        );
-      }
-    }
-
-    this.cls.set(CLS_WORKSPACE_ID, workspaceId);
-    if (user && user.id) {
+    if (this.cls.isActive()) {
+      this.cls.set('business_id', businessId);
+      this.cls.set(CLS_WORKSPACE_ID, businessId);
+      this.cls.set('workspace_id', businessId);
       this.cls.set(CLS_USER_ID, user.id);
+      this.cls.set('user_id', user.id);
     }
 
     return true;

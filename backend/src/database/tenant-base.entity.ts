@@ -7,11 +7,13 @@ export abstract class TenantBaseEntity extends BaseTable {
   populateTenantContextOnInsert(): void {
     const cls = ClsServiceManager.getClsService();
     if (cls && cls.isActive()) {
-      const workspaceId = cls.get<string>('workspace_id');
+      const businessId =
+        cls.get<string>('business_id') ||
+        cls.get<string>('workspace_id');
       const userId = cls.get<string>('user_id');
 
-      if (!this.workspace_id && workspaceId) {
-        this.workspace_id = workspaceId;
+      if (!this.business_id && businessId) {
+        this.business_id = businessId;
       }
       if (!this.created_by_id && userId) {
         this.created_by_id = userId;

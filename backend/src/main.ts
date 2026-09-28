@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, PinoLogger } from 'nestjs-pino';
@@ -7,7 +8,11 @@ import { AppValidationPipe } from './pipes/validation.pipe';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({ logger: false }),
+    { bufferLogs: true },
+  );
 
   const logger = app.get(Logger);
   app.useLogger(logger);
@@ -24,51 +29,37 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'x-workspace-id',
       'x-request-id',
     ],
   });
 
   app.setGlobalPrefix('api');
 
-  // FIX: PinoLogger is a scoped provider.
-  // Use resolve() instead of get().
   const pinoLogger = await app.resolve(PinoLogger);
   app.useGlobalFilters(new HttpExceptionFilter(pinoLogger));
-
   app.useGlobalPipes(new AppValidationPipe());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Zenvlo Engage API')
     .setDescription(
-      'Multi-tenant enterprise SaaS API for high-volume WhatsApp & Instagram automation',
+      'India-first testimonial and review management SaaS API for local businesses & D2C brands',
     )
     .setVersion('1.0.0')
     .addBearerAuth()
-    .addApiKey(
-      {
-        type: 'apiKey',
-        name: 'x-workspace-id',
-        in: 'header',
-      },
-      'x-workspace-id',
-    )
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
     },
   });
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   logger.log(
     `Zenvlo Engage API is running on: http://localhost:${port}/api`,
   );
-
   logger.log(
     `OpenAPI Swagger documentation available at: http://localhost:${port}/api/docs`,
   );

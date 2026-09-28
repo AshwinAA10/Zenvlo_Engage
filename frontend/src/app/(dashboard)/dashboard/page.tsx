@@ -1,43 +1,89 @@
-﻿'use client';
+'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  MessageSquare,
-  Users,
+  MessageSquareQuote,
+  Clock,
+  Star,
   Send,
-  Zap,
-  Radio,
   ArrowUpRight,
   ShieldCheck,
-  Cpu,
-  Layers,
-  CheckCircle2,
+  Sparkles,
+  ExternalLink,
+  Copy,
+  Check,
+  Building,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function DashboardOverviewPage() {
+  const { business } = useAuthStore();
+  const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const publicLink =
+    typeof window !== 'undefined' && business?.slug
+      ? `${window.location.origin}/submit/${business.slug}`
+      : 'https://zenvlo.com/submit/demo-business';
+
+  const copyPublicLink = () => {
+    if (typeof navigator !== 'undefined') {
+      navigator.clipboard.writeText(publicLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const businessName = mounted && business?.name ? business.name : 'Your Business';
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#10B981] flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" /> India-First Reputation Platform
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Engage Console
+            {businessName} Overview
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Unified WhatsApp & Instagram automation infrastructure
+            Monitor incoming testimonials, WhatsApp requests, and social proof widgets
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Badge variant="default" className="gap-1.5 py-1 px-3">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Foundation Ready
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Phase 1 Active
           </Badge>
-          <Link href="/channels">
-            <Button size="sm" className="gap-2">
-              <Radio className="w-4 h-4" /> Connect Channel
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={copyPublicLink}
+            className="gap-2 text-xs"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-[#10B981]" /> Copied Form Link
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" /> Copy Testimonial Link
+              </>
+            )}
+          </Button>
+          <Link href="/settings">
+            <Button size="sm" className="gap-2 text-xs">
+              <Building className="w-3.5 h-3.5" /> Edit Business Profile
             </Button>
           </Link>
         </div>
@@ -47,10 +93,10 @@ export default function DashboardOverviewPage() {
         <Card className="hover:border-[#10B981]/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Active Conversations
+              Total Testimonials
             </CardTitle>
             <div className="p-2 rounded-xl bg-[rgba(16,185,129,0.1)] text-[#10B981]">
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquareQuote className="w-4 h-4" />
             </div>
           </CardHeader>
           <CardContent>
@@ -59,7 +105,7 @@ export default function DashboardOverviewPage() {
               <span className="text-[#10B981] font-medium flex items-center">
                 +0% <ArrowUpRight className="w-3 h-3" />
               </span>{' '}
-              Awaiting channel traffic
+              Awaiting submissions
             </p>
           </CardContent>
         </Card>
@@ -67,22 +113,37 @@ export default function DashboardOverviewPage() {
         <Card className="hover:border-[#10B981]/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Contacts
+              Pending Approvals
             </CardTitle>
-            <div className="p-2 rounded-xl bg-[rgba(16,185,129,0.1)] text-[#10B981]">
-              <Users className="w-4 h-4" />
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <Clock className="w-4 h-4" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">0</div>
-            <p className="text-xs text-muted-foreground mt-1">Tenant audience directory</p>
+            <p className="text-xs text-muted-foreground mt-1">Requires business review</p>
           </CardContent>
         </Card>
 
         <Card className="hover:border-[#10B981]/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Broadcast Campaigns
+              Average Rating
+            </CardTitle>
+            <div className="p-2 rounded-xl bg-[rgba(16,185,129,0.1)] text-[#10B981]">
+              <Star className="w-4 h-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">5.0 ★</div>
+            <p className="text-xs text-muted-foreground mt-1">Calculated from approved reviews</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:border-[#10B981]/40 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              WhatsApp Requests
             </CardTitle>
             <div className="p-2 rounded-xl bg-[rgba(16,185,129,0.1)] text-[#10B981]">
               <Send className="w-4 h-4" />
@@ -90,72 +151,57 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">0</div>
-            <p className="text-xs text-muted-foreground mt-1">BullMQ queue scheduled</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:border-[#10B981]/40 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Automated Workflows
-            </CardTitle>
-            <div className="p-2 rounded-xl bg-[rgba(16,185,129,0.1)] text-[#10B981]">
-              <Zap className="w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">0</div>
-            <p className="text-xs text-muted-foreground mt-1">Trigger pipeline ready</p>
+            <p className="text-xs text-muted-foreground mt-1">Ready for Phase 4</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#10B981]" />
-                Architecture & Foundation Status
-              </CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Verified core components ready for business module plug-in
-              </p>
-            </div>
-            <Badge variant="default">All Systems Verified</Badge>
+      <div className="p-6 rounded-2xl bg-card border border-border space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-base text-foreground">
+              Core Testimonial Loop Workflow
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Phase 1 foundation is established. The sequential roadmap follows:
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Cpu className="w-4 h-4 text-[#10B981]" /> NestJS & Active Record
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                BaseTable & TenantBaseEntity automatically bind request-scoped workspace context via nestjs-cls.
-              </p>
-            </div>
+          <Badge variant="outline" className="text-xs text-[#10B981] border-[#10B981]/30">
+            Phase 1 Complete
+          </Badge>
+        </div>
 
-            <div className="p-4 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Layers className="w-4 h-4 text-[#10B981]" /> BullMQ & Webhooks
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                Asynchronous Meta webhook ingestion enqueues payloads in &lt; 50ms with zero request blocking.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <ShieldCheck className="w-4 h-4 text-[#10B981]" /> TimescaleDB Audit
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                Decoupled audit logging over EventEmitter2 with automated hypertable partitioning.
-              </p>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+          <div className="p-4 rounded-xl bg-muted/40 border border-border">
+            <span className="text-[10px] font-bold text-[#10B981] uppercase tracking-wider">Step 1</span>
+            <h4 className="text-sm font-semibold text-foreground mt-1">Business Setup</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              Account created, profile initialized, server-side tenant isolation active.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="p-4 rounded-xl bg-muted/20 border border-border/60 opacity-80">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Step 2</span>
+            <h4 className="text-sm font-semibold text-foreground mt-1">Customer Management</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              Add customers manually or import via CSV (Phase 2).
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-muted/20 border border-border/60 opacity-80">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Step 3</span>
+            <h4 className="text-sm font-semibold text-foreground mt-1">Testimonials & Review</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              Public frictionless review submission, moderation approval workflow (Phase 2 & 3).
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-muted/20 border border-border/60 opacity-80">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Step 4</span>
+            <h4 className="text-sm font-semibold text-foreground mt-1">WhatsApp & Widgets</h4>
+            <p className="text-xs text-muted-foreground mt-1">
+              Automated request delivery via WhatsApp service & embeddable website widgets (Phase 4 & 6).
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

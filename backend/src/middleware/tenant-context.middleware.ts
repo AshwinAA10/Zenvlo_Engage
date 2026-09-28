@@ -1,16 +1,21 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
 import { ClsService } from 'nestjs-cls';
-import { HEADER_WORKSPACE_ID, CLS_WORKSPACE_ID } from '../common/constants';
 
+/**
+ * TenantContextMiddleware
+ *
+ * Enforces PRD Security Invariant: Client-supplied tenant/business headers are NEVER trusted.
+ * Business tenant context is strictly derived on the server by JwtStrategy and authenticated guards.
+ */
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
   constructor(private readonly cls: ClsService) {}
 
-  use(req: Request, _res: Response, next: NextFunction): void {
-    const workspaceId = req.headers[HEADER_WORKSPACE_ID] as string;
-    if (workspaceId) {
-      this.cls.set(CLS_WORKSPACE_ID, workspaceId);
+  use(req: any, _res: any, next: (err?: any) => void): void {
+    // Request tracking ID
+    const requestId = (req.headers && req.headers['x-request-id']) as string;
+    if (requestId && this.cls.isActive()) {
+      this.cls.set('request_id', requestId);
     }
     next();
   }

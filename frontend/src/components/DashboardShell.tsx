@@ -1,17 +1,18 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
   LayoutDashboard,
-  MessageSquare,
-  Send,
+  MessageSquareQuote,
+  Star,
   Users,
-  Zap,
-  Bot,
-  Radio,
+  Send,
+  Layout,
+  Puzzle,
+  CreditCard,
   Settings,
   Menu,
   X,
@@ -28,13 +29,14 @@ import { useAuthStore } from '@/stores/authStore';
 import { ZenvloLogo } from '@/components/ZenvloLogo';
 
 const navItems = [
-  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Chats', href: '/chats', icon: MessageSquare, badge: '3' },
-  { label: 'Campaigns', href: '/campaigns', icon: Send },
-  { label: 'Contacts', href: '/contacts', icon: Users },
-  { label: 'Workflows', href: '/workflows', icon: Zap },
-  { label: 'AI Agents', href: '/ai-agents', icon: Bot, badge: 'New' },
-  { label: 'Channels', href: '/channels', icon: Radio },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Testimonials', href: '/testimonials', icon: MessageSquareQuote },
+  { label: 'Reviews', href: '/reviews', icon: Star },
+  { label: 'Customers', href: '/customers', icon: Users },
+  { label: 'WhatsApp Requests', href: '/requests', icon: Send },
+  { label: 'Widgets', href: '/widgets', icon: Layout },
+  { label: 'Integrations', href: '/integrations', icon: Puzzle },
+  { label: 'Billing', href: '/billing', icon: CreditCard },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -43,26 +45,36 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { user, currentWorkspaceId, logout } = useAuthStore();
+  const { user, business, logout } = useAuthStore();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const currentTheme = mounted ? (resolvedTheme || theme) : 'dark';
-  const displayedWorkspaceId =
-    mounted && currentWorkspaceId
-      ? currentWorkspaceId.slice(0, 8) + '...'
-      : 'Default';
+  const displayedBusinessName =
+    mounted && business?.name
+      ? business.name
+      : 'My Business';
+  const displayedCategory =
+    mounted && business?.category
+      ? business.category
+      : 'Review Management';
   const displayedEmail =
     mounted && user?.email
       ? user.email
-      : 'admin@zenvlo.com';
+      : 'owner@business.com';
   const displayedInitials =
     mounted && user?.email
       ? user.email.slice(0, 2).toUpperCase()
       : 'ZE';
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -84,7 +96,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </Link>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg border border-border bg-muted text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+            className="hidden lg:flex items-center justify-center w-7 h-7 rounded-lg border border-border bg-muted text-muted-foreground hover:text-foreground hover:border-border transition-colors cursor-pointer"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -100,22 +112,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <div className="mx-3 my-3 p-2.5 rounded-xl bg-muted/60 border border-border flex items-center justify-between">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-[rgba(16,185,129,0.15)] border border-[#10B981]/30 flex items-center justify-center text-[#10B981]">
+              <div className="w-8 h-8 rounded-lg bg-[rgba(16,185,129,0.15)] border border-[#10B981]/30 flex items-center justify-center text-[#10B981] shrink-0">
                 <Building className="w-4 h-4" />
               </div>
               <div className="flex flex-col truncate">
                 <span className="text-xs font-semibold text-foreground truncate">
-                  Default Workspace
+                  {displayedBusinessName}
                 </span>
                 <span className="text-[10px] text-muted-foreground font-mono truncate">
-                  {displayedWorkspaceId}
+                  {displayedCategory}
                 </span>
               </div>
             </div>
           </div>
         )}
 
-        <nav className="flex-1 space-y-1.5 px-3 py-3 overflow-y-auto">
+        <nav className="flex-1 space-y-1 px-3 py-3 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -138,17 +150,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   }`}
                 />
                 {!collapsed && <span className="truncate">{item.label}</span>}
-                {!collapsed && item.badge && (
-                  <span
-                    className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      isActive
-                        ? 'bg-[#10B981] text-white'
-                        : 'bg-muted text-[#10B981] border border-[#10B981]/20'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -167,14 +168,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <span className="text-xs font-semibold text-foreground truncate">
                     {displayedEmail}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">Admin</span>
+                  <span className="text-[10px] text-muted-foreground">Business Owner</span>
                 </div>
               )}
             </div>
             {!collapsed && (
               <button
-                onClick={logout}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                onClick={handleLogout}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />
@@ -201,7 +202,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <span>Zenvlo Engage</span>
               <span>/</span>
               <span className="text-foreground font-medium capitalize">
-                {pathname.replace('/', '') || 'Overview'}
+                {pathname.replace('/', '') || 'Dashboard'}
               </span>
             </div>
           </div>
