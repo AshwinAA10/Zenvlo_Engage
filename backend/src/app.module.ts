@@ -13,6 +13,8 @@ import { SystemModule } from './modules/System/System.module';
 import { UserModule } from './modules/User/User.module';
 import { BusinessModule } from './modules/Business/Business.module';
 import { AuthModule } from './modules/Auth/Auth.module';
+import { CustomerModule } from './modules/Customer/Customer.module';
+import { TestimonialModule } from './modules/Testimonial/Testimonial.module';
 import { IntegrationModule } from './modules/Integration/Integration.module';
 
 @Module({
@@ -57,7 +59,7 @@ import { IntegrationModule } from './modules/Integration/Integration.module';
         mount: true,
         generateId: true,
         idGenerator: (req: any) =>
-          (req.headers && req.headers['x-request-id'] as string) || uuidv4(),
+          (req.headers && (req.headers['x-request-id'] as string)) || uuidv4(),
       },
     }),
 
@@ -80,6 +82,8 @@ import { IntegrationModule } from './modules/Integration/Integration.module';
     UserModule,
     BusinessModule,
     AuthModule,
+    CustomerModule,
+    TestimonialModule,
     IntegrationModule,
   ],
 })
