@@ -22,4 +22,10 @@ export class Customer extends TenantBaseEntity {
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  last_request_sent_at: Date | null;
+
+  @Column({ type: 'integer', default: 0 })
+  request_count: number;
 }

@@ -6,6 +6,7 @@ import {
 import { Testimonial, ApprovalStatus } from '../entities/testimonial.entity';
 import { Business } from '../../Business/entities/business.entity';
 import { Customer } from '../../Customer/entities/customer.entity';
+import { RequestLog } from '../../Request/entities/request-log.entity';
 import {
   SubmitPublicTestimonialDto,
   UpdateTestimonialStatusDto,
@@ -63,6 +64,28 @@ export class TestimonialService {
     testimonial.updated_by_id = business.user_id;
 
     await testimonial.save();
+
+    // Link feedback with pending WhatsApp request log if matched
+    if (testimonial.customer_phone) {
+      try {
+        const unlinkedLog = await RequestLog.createQueryBuilder('log')
+          .where('log.business_id = :businessId', { businessId: business.id })
+          .andWhere('log.customer_phone = :phone', {
+            phone: testimonial.customer_phone,
+          })
+          .andWhere('log.testimonial_id IS NULL')
+          .orderBy('log.created_on', 'DESC')
+          .getOne();
+
+        if (unlinkedLog) {
+          unlinkedLog.testimonial_id = testimonial.id;
+          unlinkedLog.response_received_at = new Date();
+          await unlinkedLog.save();
+        }
+      } catch {
+        // Silently continue if log linking fails
+      }
+    }
 
     return {
       success: true,

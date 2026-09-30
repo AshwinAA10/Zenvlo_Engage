@@ -27,6 +27,9 @@ import {
   Phone,
   Mail,
   FileSpreadsheet,
+  Send,
+  MessageSquare,
+  Check,
 } from 'lucide-react';
 
 interface Customer {
@@ -36,6 +39,8 @@ interface Customer {
   email: string | null;
   notes: string | null;
   tags: string[];
+  last_request_sent_at?: string | null;
+  request_count?: number;
   created_on: string;
 }
 
@@ -45,6 +50,12 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+
+  // Selection & WhatsApp Request states
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
+  const [batchSending, setBatchSending] = useState(false);
 
   // Dialog states
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -189,6 +200,56 @@ export default function CustomersPage() {
     reader.readAsText(file);
   };
 
+  const handleSendSingleRequest = async (c: Customer) => {
+    try {
+      setSendingId(c.id);
+      await apiClient.post('/requests/send', {
+        customer_id: c.id,
+      });
+      setRequestSuccess(`WhatsApp review request dispatched to ${c.name}!`);
+      setTimeout(() => setRequestSuccess(null), 3500);
+      fetchCustomers();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to dispatch WhatsApp request');
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const handleBatchSendRequests = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      setBatchSending(true);
+      await apiClient.post('/requests/batch', {
+        customer_ids: selectedIds,
+      });
+      setRequestSuccess(`Dispatched WhatsApp requests to ${selectedIds.length} selected contacts!`);
+      setTimeout(() => setRequestSuccess(null), 3500);
+      setSelectedIds([]);
+      fetchCustomers();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to dispatch batch WhatsApp requests');
+    } finally {
+      setBatchSending(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === customers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(customers.map((c) => c.id));
+    }
+  };
+
+  const toggleSelectCustomer = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter((item) => item !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
@@ -243,6 +304,52 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
+      {/* Request Success Banner */}
+      {requestSuccess && (
+        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#10B981]/15 border border-[#10B981]/30 text-[#10B981] text-xs">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{requestSuccess}</span>
+        </div>
+      )}
+
+      {/* Batch Action Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="p-3 rounded-2xl bg-[#10B981]/10 border border-[#10B981]/30 flex items-center justify-between gap-4">
+          <div className="text-xs text-foreground font-semibold flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-[#10B981] text-white flex items-center justify-center text-[10px] font-bold">
+              {selectedIds.length}
+            </span>
+            <span>Contacts Selected</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedIds([])}
+              className="h-8 text-xs"
+            >
+              Clear Selection
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleBatchSendRequests}
+              disabled={batchSending}
+              className="h-8 text-xs font-bold gap-1.5"
+            >
+              {batchSending ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Dispatching...
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" /> Send WhatsApp Request ({selectedIds.length})
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Customer List Table */}
       <Card>
         <CardContent className="p-0">
@@ -274,72 +381,129 @@ export default function CustomersPage() {
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
                   <tr>
+                    <th className="py-3 px-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.length === customers.length && customers.length > 0}
+                        onChange={toggleSelectAll}
+                        className="rounded border-border accent-[#10B981]"
+                      />
+                    </th>
                     <th className="py-3 px-4">Customer</th>
                     <th className="py-3 px-4">WhatsApp Phone</th>
                     <th className="py-3 px-4">Email Address</th>
                     <th className="py-3 px-4">Tags</th>
+                    <th className="py-3 px-4">WhatsApp Requests</th>
                     <th className="py-3 px-4">Added On</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {customers.map((c) => (
-                    <tr key={c.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-foreground">{c.name}</td>
-                      <td className="py-3 px-4 font-mono text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <Phone className="w-3 h-3 text-[#10B981]" /> {c.phone}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {c.email ? (
+                  {customers.map((c) => {
+                    const isSelected = selectedIds.includes(c.id);
+                    const isSendingThis = sendingId === c.id;
+
+                    return (
+                      <tr
+                        key={c.id}
+                        className={`transition-colors ${
+                          isSelected ? 'bg-[#10B981]/5' : 'hover:bg-muted/30'
+                        }`}
+                      >
+                        <td className="py-3 px-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectCustomer(c.id)}
+                            className="rounded border-border accent-[#10B981]"
+                          />
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-foreground">{c.name}</td>
+                        <td className="py-3 px-4 font-mono text-muted-foreground">
                           <span className="flex items-center gap-1.5">
-                            <Mail className="w-3 h-3" /> {c.email}
+                            <Phone className="w-3 h-3 text-[#10B981]" /> {c.phone}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground/40">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {c.tags && c.tags.length > 0 ? (
-                            c.tags.map((tag) => (
-                              <Badge
-                                key={tag}
-                                variant="secondary"
-                                className="text-[10px] py-0 px-2 font-normal"
-                              >
-                                {tag}
-                              </Badge>
-                            ))
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {c.email ? (
+                            <span className="flex items-center gap-1.5">
+                              <Mail className="w-3 h-3" /> {c.email}
+                            </span>
                           ) : (
                             <span className="text-muted-foreground/40">—</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {new Date(c.created_on).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleOpenEdit(c)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(c.id)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {c.tags && c.tags.length > 0 ? (
+                              c.tags.map((tag) => (
+                                <Badge
+                                  key={tag}
+                                  variant="secondary"
+                                  className="text-[10px] py-0 px-2 font-normal"
+                                >
+                                  {tag}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground/40">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {c.request_count && c.request_count > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                              <span className="font-semibold text-foreground">
+                                Sent {c.request_count}x
+                              </span>
+                              {c.last_request_sent_at && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  ({new Date(c.last_request_sent_at).toLocaleDateString()})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground/50">Not sent yet</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {new Date(c.created_on).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleSendSingleRequest(c)}
+                              disabled={isSendingThis}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981] hover:bg-[#10B981]/20 transition-colors text-[11px] font-medium cursor-pointer disabled:opacity-50"
+                              title="Send WhatsApp testimonial request"
+                            >
+                              {isSendingThis ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Send className="w-3 h-3" />
+                              )}
+                              <span>Request</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(c)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(c.id)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
