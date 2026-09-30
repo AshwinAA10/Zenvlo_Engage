@@ -13,7 +13,11 @@ import { SystemModule } from './modules/System/System.module';
 import { UserModule } from './modules/User/User.module';
 import { BusinessModule } from './modules/Business/Business.module';
 import { AuthModule } from './modules/Auth/Auth.module';
+import { CustomerModule } from './modules/Customer/Customer.module';
+import { TestimonialModule } from './modules/Testimonial/Testimonial.module';
+import { StorageModule } from './modules/Storage/Storage.module';
 import { IntegrationModule } from './modules/Integration/Integration.module';
+import { RequestModule } from './modules/Request/Request.module';
 
 @Module({
   imports: [
@@ -57,7 +61,7 @@ import { IntegrationModule } from './modules/Integration/Integration.module';
         mount: true,
         generateId: true,
         idGenerator: (req: any) =>
-          (req.headers && req.headers['x-request-id'] as string) || uuidv4(),
+          (req.headers && (req.headers['x-request-id'] as string)) || uuidv4(),
       },
     }),
 
@@ -80,7 +84,11 @@ import { IntegrationModule } from './modules/Integration/Integration.module';
     UserModule,
     BusinessModule,
     AuthModule,
+    CustomerModule,
+    TestimonialModule,
+    StorageModule,
     IntegrationModule,
+    RequestModule,
   ],
 })
 export class AppModule implements NestModule {

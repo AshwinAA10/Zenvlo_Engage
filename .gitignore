@@ -40,3 +40,7 @@ Thumbs.db
 # Docker
 postgres_data/
 redis_data/
+
+# Local Storage Uploads
+uploads/
+backend/uploads/

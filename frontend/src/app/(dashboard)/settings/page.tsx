@@ -6,13 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
 import { apiClient } from '@/lib/axios';
-import { Building, ShieldCheck, User as UserIcon, Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
+import { Building, ShieldCheck, User as UserIcon, Loader2, CheckCircle2, AlertCircle, ExternalLink, UploadCloud, Trash2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, business, setBusiness } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +79,41 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo image size must not exceed 5MB');
+      return;
+    }
+
+    setLogoUploading(true);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      try {
+        const res = await apiClient.post('/storage/upload', {
+          data: base64,
+          filename: file.name,
+          category: 'logo',
+        });
+        setForm((prev) => ({ ...prev, logo_url: res.data.url }));
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Failed to upload logo image');
+      } finally {
+        setLogoUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setError('Failed to read logo file');
+      setLogoUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (!mounted) return null;
 
   return (
@@ -113,6 +149,63 @@ export default function SettingsPage() {
                 <span>Business profile updated successfully!</span>
               </div>
             )}
+
+            {/* Business Logo Upload */}
+            <div className="space-y-2 pb-4 border-b border-border">
+              <label className="text-xs font-semibold text-muted-foreground">Business Logo</label>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl border border-border bg-muted/40 overflow-hidden flex items-center justify-center shrink-0">
+                  {form.logo_url ? (
+                    <img
+                      src={form.logo_url}
+                      alt="Business Logo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Building className="w-7 h-7 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center justify-center rounded-xl text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-border bg-card hover:bg-accent text-foreground h-8 px-3">
+                      {logoUploading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5 text-[#10B981]" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-3.5 h-3.5 mr-1.5 text-[#10B981]" />
+                          Upload New Logo
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="hidden"
+                        disabled={logoUploading || saving}
+                        onChange={handleLogoUpload}
+                      />
+                    </label>
+                    {form.logo_url && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 border-red-500/30"
+                        onClick={() => setForm({ ...form, logo_url: '' })}
+                        disabled={logoUploading || saving}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Recommended: Square PNG, JPG, or WebP. Max 5MB.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
