@@ -6,10 +6,12 @@ import { Testimonial } from '../Testimonial/entities/testimonial.entity';
 import { Review } from '../Review/entities/review.entity';
 import { WidgetService } from './services/widget.service';
 import { WidgetController } from './controllers/widget.controller';
+import { BillingModule } from '../Billing/Billing.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Widget, Business, Testimonial, Review]),
+    BillingModule,
   ],
   controllers: [WidgetController],
   providers: [WidgetService],

@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import {
   WHATSAPP_INTEGRATION_SERVICE,
   IWhatsAppIntegrationService,
 } from '../../Integration/interfaces/whatsapp-integration.interface';
+import { UsageService } from '../../Billing/services/usage.service';
 
 @Injectable()
 export class RequestService {
@@ -26,6 +28,8 @@ export class RequestService {
     private readonly logger: PinoLogger,
     @Inject(WHATSAPP_INTEGRATION_SERVICE)
     private readonly whatsappService: IWhatsAppIntegrationService,
+    @Optional()
+    private readonly usageService?: UsageService,
   ) {
     this.logger.setContext(RequestService.name);
   }
@@ -34,7 +38,12 @@ export class RequestService {
     businessId: string,
     dto: SendRequestDto,
   ): Promise<RequestLog> {
+    if (this.usageService) {
+      await this.usageService.CheckCanSendWhatsAppRequest(businessId);
+    }
+
     const business = await Business.findOne({ where: { id: businessId } });
+
     if (!business) {
       throw new NotFoundException('Business not found');
     }
@@ -113,6 +122,10 @@ export class RequestService {
       deliveryStatus: log.delivery_status,
       messageId: log.message_id,
     });
+
+    if (this.usageService) {
+      await this.usageService.IncrementWhatsAppUsage(businessId);
+    }
 
     return savedLog;
   }

@@ -20,6 +20,7 @@ import { IntegrationModule } from './modules/Integration/Integration.module';
 import { RequestModule } from './modules/Request/Request.module';
 import { ReviewModule } from './modules/Review/Review.module';
 import { WidgetModule } from './modules/Widget/Widget.module';
+import { BillingModule } from './modules/Billing/Billing.module';
 
 @Module({
   imports: [
@@ -93,6 +94,7 @@ import { WidgetModule } from './modules/Widget/Widget.module';
     RequestModule,
     ReviewModule,
     WidgetModule,
+    BillingModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import * as crypto from 'crypto';
@@ -16,14 +17,23 @@ import {
   PublicWidgetResponseDto,
   PublicSocialProofItem,
 } from '../models/widget.dto';
+import { UsageService } from '../../Billing/services/usage.service';
 
 @Injectable()
 export class WidgetService {
-  constructor(private readonly logger: PinoLogger) {
+  constructor(
+    private readonly logger: PinoLogger,
+    @Optional()
+    private readonly usageService?: UsageService,
+  ) {
     this.logger.setContext(WidgetService.name);
   }
 
   async CreateWidget(businessId: string, dto: CreateWidgetDto): Promise<Widget> {
+    if (this.usageService) {
+      await this.usageService.CheckCanCreateWidget(businessId);
+    }
+
     const business = await Business.findOne({ where: { id: businessId } });
     if (!business) {
       throw new NotFoundException('Business not found');
