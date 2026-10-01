@@ -18,6 +18,7 @@ import { TestimonialModule } from './modules/Testimonial/Testimonial.module';
 import { StorageModule } from './modules/Storage/Storage.module';
 import { IntegrationModule } from './modules/Integration/Integration.module';
 import { RequestModule } from './modules/Request/Request.module';
+import { ReviewModule } from './modules/Review/Review.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { RequestModule } from './modules/Request/Request.module';
     StorageModule,
     IntegrationModule,
     RequestModule,
+    ReviewModule,
   ],
 })
 export class AppModule implements NestModule {
