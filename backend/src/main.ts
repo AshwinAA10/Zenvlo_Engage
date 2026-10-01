@@ -23,13 +23,17 @@ async function bootstrap() {
     configService.get<string>('CORS_ORIGIN') || 'http://localhost:3000';
 
   app.enableCors({
-    origin: corsOrigin,
+    origin: (origin, cb) => {
+      // Allow requests from frontend, local dev, or external websites loading public widgets
+      cb(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
       'x-request-id',
+      'x-razorpay-signature',
     ],
   });
 
@@ -49,10 +53,12 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
+  // Support both /docs (as required by PRD Section 25) and /api/docs
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: { persistAuthorization: true },
+  });
   SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
+    swaggerOptions: { persistAuthorization: true },
   });
 
   await app.listen(port, '0.0.0.0');

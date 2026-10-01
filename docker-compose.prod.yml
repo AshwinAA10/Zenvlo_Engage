@@ -1,0 +1,114 @@
+# =================================================================
+# Zenvlo Engage - Production Docker Compose Deployment
+# =================================================================
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database with Persistent Storage
+  postgres:
+    image: postgres:16-alpine
+    container_name: zenvlo_engage_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zenvlo_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      POSTGRES_DB: ${POSTGRES_DB:-zenvlo_engage}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zenvlo_admin} -d ${POSTGRES_DB:-zenvlo_engage}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zenvlo_network
+
+  # 2. Redis Cache & Queue Broker
+  redis:
+    image: redis:7-alpine
+    container_name: zenvlo_engage_redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-zenvlo_redis_secret}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-zenvlo_redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zenvlo_network
+
+  # 3. Zenvlo Engage Backend Service (NestJS + Fastify)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zenvlo_engage_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-zenvlo_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-zenvlo_engage}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-zenvlo_redis_secret}
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      JWT_EXPIRATION: 86400s
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT refresh secret required}
+      JWT_REFRESH_EXPIRATION: 30d
+      CORS_ORIGIN: ${FRONTEND_URL:-https://app.zenvlo.com}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+    ports:
+      - "4000:4000"
+    networks:
+      - zenvlo_network
+
+  # 4. Zenvlo Engage Frontend Service (Next.js App Router)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: zenvlo_engage_frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.zenvlo.com/api}
+      NEXT_PUBLIC_APP_URL: ${FRONTEND_URL:-https://app.zenvlo.com}
+    ports:
+      - "3000:3000"
+    networks:
+      - zenvlo_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  zenvlo_network:
+    driver: bridge
