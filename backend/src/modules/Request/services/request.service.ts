@@ -86,6 +86,11 @@ export class RequestService {
       customMessage: dto.custom_message,
     });
 
+    const isSuccess = integrationResult.success;
+    const deliveryStatus = isSuccess
+      ? (integrationResult.status as RequestStatus)
+      : 'FAILED';
+
     const log = new RequestLog();
     log.business_id = businessId;
     log.customer_id = customer ? customer.id : null;
@@ -95,35 +100,45 @@ export class RequestService {
     log.template_name = 'testimonial_request';
     log.testimonial_url = testimonialUrl;
     log.custom_message = dto.custom_message || null;
-    log.delivery_status = integrationResult.status as RequestStatus;
-    log.message_id = integrationResult.messageId || null;
-    log.error_message = integrationResult.errorMessage || null;
+    log.delivery_status = deliveryStatus;
+    log.message_id =
+      isSuccess && integrationResult.messageId
+        ? integrationResult.messageId
+        : null;
+    log.error_message = isSuccess
+      ? null
+      : integrationResult.errorMessage ||
+        'Provider failed to send WhatsApp message';
     log.sent_at = new Date();
 
     if (
-      integrationResult.status === 'DELIVERED' ||
-      integrationResult.status === 'SENT'
+      isSuccess &&
+      (integrationResult.status === 'DELIVERED' ||
+        integrationResult.status === 'SENT')
     ) {
       log.delivered_at = new Date();
     }
 
     const savedLog = await log.save();
 
-    if (customer) {
+    if (customer && isSuccess) {
       customer.last_request_sent_at = new Date();
       customer.request_count = (customer.request_count || 0) + 1;
       await customer.save();
     }
 
     this.logger.info({
-      msg: 'WhatsApp testimonial request logged',
+      msg: isSuccess
+        ? 'WhatsApp testimonial request logged'
+        : 'WhatsApp testimonial request failed',
       businessId,
       customerId: log.customer_id,
       deliveryStatus: log.delivery_status,
       messageId: log.message_id,
+      errorMessage: log.error_message,
     });
 
-    if (this.usageService) {
+    if (this.usageService && isSuccess) {
       await this.usageService.IncrementWhatsAppUsage(businessId);
     }
 
@@ -154,7 +169,11 @@ export class RequestService {
           custom_message: dto.custom_message,
         });
         logs.push(log);
-        queued++;
+        if (log.delivery_status === 'FAILED') {
+          failed++;
+        } else {
+          queued++;
+        }
       } catch (err: any) {
         this.logger.error({
           msg: 'Failed to send batch request to customer',
@@ -240,9 +259,13 @@ export class RequestService {
       if (log.testimonial_id) feedback_received++;
     }
 
+    const isProduction = process.env.NODE_ENV === 'production';
     const delivery_rate =
       total_sent > 0
-        ? Math.round(((delivered + pending_contract) / total_sent) * 100)
+        ? Math.round(
+            ((delivered + (isProduction ? 0 : pending_contract)) / total_sent) *
+              100,
+          )
         : 100;
 
     const feedback_conversion_rate =

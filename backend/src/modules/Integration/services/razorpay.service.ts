@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import * as crypto from 'crypto';
 import {
@@ -14,8 +14,18 @@ export class RazorpayService implements IRazorpayService {
   private readonly keySecret: string;
   private readonly webhookSecret: string;
   private readonly isConfigured: boolean;
+  private readonly logger: PinoLogger;
 
-  constructor(private readonly logger: PinoLogger) {
+  constructor(@Optional() logger?: PinoLogger) {
+    this.logger =
+      logger ||
+      ({
+        setContext: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+      } as any);
     this.logger.setContext(RazorpayService.name);
     this.keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_zenvlo_engage';
     this.keySecret = process.env.RAZORPAY_KEY_SECRET || 'zenvlo_engage_secret_mock';

@@ -22,11 +22,14 @@ import { ReviewModule } from './modules/Review/Review.module';
 import { WidgetModule } from './modules/Widget/Widget.module';
 import { BillingModule } from './modules/Billing/Billing.module';
 
+import { validateEnvironment } from './config/env.validation';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.local'],
+      validate: validateEnvironment,
     }),
 
     LoggerModule.forRootAsync({

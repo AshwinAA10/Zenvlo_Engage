@@ -59,11 +59,26 @@ export class WebhookService {
   }
 
   VerifyMetaToken(mode: string, token: string, challenge: string): string {
-    const configuredToken =
-      this.configService.get<string>('WHATSAPP_VERIFY_TOKEN') ||
-      'placeholder_whatsapp_verify_token';
+    const isProduction =
+      (this.configService.get<string>('NODE_ENV') || process.env.NODE_ENV) ===
+      'production';
+    const configuredToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN');
 
-    if (mode === 'subscribe' && token === configuredToken) {
+    if (
+      isProduction &&
+      (!configuredToken ||
+        configuredToken === 'placeholder_whatsapp_verify_token')
+    ) {
+      throw new UnauthorizedException(
+        'WHATSAPP_VERIFY_TOKEN is not configured for production',
+      );
+    }
+
+    const tokenToMatch =
+      configuredToken ||
+      (isProduction ? '' : 'placeholder_whatsapp_verify_token');
+
+    if (mode === 'subscribe' && token && token === tokenToMatch) {
       return challenge;
     }
     throw new UnauthorizedException('Meta Webhook verification token mismatch');
