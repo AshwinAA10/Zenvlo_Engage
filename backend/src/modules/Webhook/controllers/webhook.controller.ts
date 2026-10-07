@@ -7,6 +7,8 @@ import {
   Param,
   Body,
   Query,
+  Headers,
+  Req,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
@@ -37,9 +39,21 @@ export class WebhookController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Meta Webhook event ingestion (WhatsApp / Instagram)' })
   @ApiResponse({ status: 200, description: 'Event accepted and enqueued' })
-  async handleMetaWebhook(@Body() payload: any) {
-    await this.webhookService.EnqueueMetaWebhook(payload);
-    return { status: 'EVENT_RECEIVED' };
+  async handleMetaWebhook(
+    @Body() payload: any,
+    @Headers('x-hub-signature-256') signature?: string,
+    @Headers('x-hub-timestamp') timestamp?: string,
+    @Req() req?: any,
+  ) {
+    const rawBody = req?.rawBody
+      ? (Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : String(req.rawBody))
+      : JSON.stringify(payload);
+
+    return this.webhookService.EnqueueMetaWebhook(payload, {
+      signature,
+      timestamp,
+      rawBody,
+    });
   }
 
   @Get('receivers')

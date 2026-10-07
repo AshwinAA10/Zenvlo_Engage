@@ -34,6 +34,10 @@ async function bootstrap() {
       'Authorization',
       'x-request-id',
       'x-razorpay-signature',
+      'x-hub-signature-256',
+      'x-hub-timestamp',
+      'x-zenvlo-signature',
+      'x-zenvlo-timestamp',
     ],
   });
 

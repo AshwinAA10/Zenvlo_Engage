@@ -95,6 +95,17 @@ export function validateEnvironment(config: Record<string, any>): Record<string,
       errors.push('[SECURITY FATAL] POSTGRES_PASSWORD is required in production.');
     }
 
+    // 6. Webhook Secrets Validation
+    const metaAppSecret = config.META_APP_SECRET || process.env.META_APP_SECRET;
+    if (metaAppSecret && (metaAppSecret.startsWith('placeholder_') || metaAppSecret.includes('your_live_'))) {
+      errors.push('[SECURITY FATAL] META_APP_SECRET cannot use placeholder credentials in production.');
+    }
+
+    const zenvloWebhookSecret = config.ZENVLO_WHATSAPP_WEBHOOK_SECRET || process.env.ZENVLO_WHATSAPP_WEBHOOK_SECRET;
+    if (zenvloWebhookSecret && (zenvloWebhookSecret.startsWith('placeholder_') || zenvloWebhookSecret.includes('your_internal_'))) {
+      errors.push('[SECURITY FATAL] ZENVLO_WHATSAPP_WEBHOOK_SECRET cannot use placeholder credentials in production.');
+    }
+
     if (errors.length > 0) {
       throw new Error(`Production Environment Configuration Validation Failed:\n- ${errors.join('\n- ')}`);
     }

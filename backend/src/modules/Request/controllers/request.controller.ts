@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Query,
+  Headers,
   UseGuards,
   Req,
   HttpCode,
@@ -99,7 +100,22 @@ export class RequestController {
       'Inbound webhook callback from Zenvlo Engage WhatsApp capability for delivery receipts',
   })
   @ApiResponse({ status: 200 })
-  async InboundWebhook(@Body() dto: WhatsAppWebhookDto) {
-    return this.requestService.HandleWebhook(dto);
+  async InboundWebhook(
+    @Body() dto: WhatsAppWebhookDto,
+    @Headers('x-zenvlo-signature') zenvloSig?: string,
+    @Headers('x-hub-signature-256') hubSig?: string,
+    @Headers('x-zenvlo-timestamp') zenvloTs?: string,
+    @Headers('x-hub-timestamp') hubTs?: string,
+    @Req() req?: any,
+  ) {
+    const rawBody = req?.rawBody
+      ? (Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : String(req.rawBody))
+      : JSON.stringify(dto);
+
+    return this.requestService.HandleWebhook(dto, {
+      signature: zenvloSig || hubSig,
+      timestamp: zenvloTs || hubTs || dto.timestamp,
+      rawBody,
+    });
   }
 }

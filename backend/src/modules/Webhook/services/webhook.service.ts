@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClsService } from 'nestjs-cls';
 import { WebhookReceiver } from '../entities/webhook-receiver.entity';
 import { CreateWebhookReceiverDto, UpdateWebhookReceiverDto } from '../models/webhook.dto';
 import { QueueService } from '../../Queue/services/queue.service';
+import { WebhookSecurityService } from './webhook-security.service';
 import { CLS_WORKSPACE_ID } from '../../../common/constants';
 
 @Injectable()
@@ -12,6 +18,7 @@ export class WebhookService {
     private readonly cls: ClsService,
     private readonly configService: ConfigService,
     private readonly queueService: QueueService,
+    private readonly webhookSecurityService: WebhookSecurityService,
   ) {}
 
   async GetAll(): Promise<WebhookReceiver[]> {
@@ -84,8 +91,78 @@ export class WebhookService {
     throw new UnauthorizedException('Meta Webhook verification token mismatch');
   }
 
-  async EnqueueMetaWebhook(payload: any): Promise<{ status: string; jobId: string }> {
-    const jobId = await this.queueService.EnqueueWebhook(payload);
-    return { status: 'enqueued', jobId };
+  async EnqueueMetaWebhook(
+    payload: any,
+    securityContext?: {
+      signature?: string;
+      timestamp?: string | number;
+      rawBody?: string;
+    },
+  ): Promise<{ status: string; jobId?: string; duplicate?: boolean }> {
+    const rawBody = securityContext?.rawBody || JSON.stringify(payload);
+
+    // 1. Validate payload size
+    this.webhookSecurityService.ValidatePayloadSize(rawBody);
+
+    // 2. Validate structural shape of Meta webhook payload
+    this.webhookSecurityService.ValidateMetaPayloadShape(payload);
+
+    const isProduction =
+      (this.configService.get<string>('NODE_ENV') || process.env.NODE_ENV) ===
+      'production';
+
+    // 3. Signature verification
+    const secret =
+      this.configService.get<string>('META_APP_SECRET') ||
+      process.env.META_APP_SECRET;
+
+    if (isProduction || securityContext?.signature) {
+      this.webhookSecurityService.VerifySignature(
+        rawBody,
+        securityContext?.signature,
+        secret,
+        'Meta Webhook',
+      );
+    }
+
+    // 4. Timestamp & Replay verification
+    const timestamp =
+      securityContext?.timestamp ||
+      payload.entry?.[0]?.time ||
+      payload.entry?.[0]?.changes?.[0]?.value?.statuses?.[0]?.timestamp ||
+      payload.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.timestamp;
+
+    if (timestamp !== undefined && timestamp !== null) {
+      this.webhookSecurityService.ValidateTimestamp(
+        timestamp,
+        undefined,
+        'Meta Webhook',
+      );
+    } else if (isProduction) {
+      throw new BadRequestException('Missing webhook timestamp in production');
+    }
+
+    // 5. Idempotency deduplication
+    const changeVal = payload.entry?.[0]?.changes?.[0]?.value;
+    const eventId =
+      changeVal?.statuses?.[0]?.id ||
+      changeVal?.messages?.[0]?.id ||
+      `${payload.entry?.[0]?.id || 'meta'}_${timestamp || Date.now()}_${payload.object}`;
+
+    const idempotencyKey = `meta_wh:${eventId}`;
+
+    const execution = await this.webhookSecurityService.ExecuteIdempotent(
+      idempotencyKey,
+      async () => {
+        const jobId = await this.queueService.EnqueueWebhook(payload);
+        return jobId;
+      },
+    );
+
+    if (execution.duplicate) {
+      return { status: 'ALREADY_PROCESSED', duplicate: true };
+    }
+
+    return { status: 'EVENT_RECEIVED', jobId: execution.result };
   }
 }
