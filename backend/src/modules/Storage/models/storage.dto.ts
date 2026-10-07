@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsIn, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsIn, IsOptional, IsUUID, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UploadBase64Dto {
@@ -23,6 +23,16 @@ export class UploadBase64Dto {
   @IsIn(['photo', 'video', 'logo'])
   @IsOptional()
   category?: 'photo' | 'video' | 'logo' = 'photo';
+
+  @ApiPropertyOptional({ description: 'Tenant UUID for private tenant uploads' })
+  @IsOptional()
+  @IsUUID()
+  business_id?: string;
+
+  @ApiPropertyOptional({ description: 'Flag indicating whether upload is private to tenant' })
+  @IsOptional()
+  @IsBoolean()
+  is_private?: boolean;
 }
 
 export class UploadResponseDto {

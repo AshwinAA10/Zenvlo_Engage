@@ -10,7 +10,10 @@ import { HttpExceptionFilter } from './filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: false }),
+    new FastifyAdapter({
+      logger: false,
+      bodyLimit: 50 * 1024 * 1024, // 50MB maximum request body ceiling
+    }),
     { bufferLogs: true },
   );
 
