@@ -14,6 +14,18 @@ export interface EnvironmentVariables {
   ZENVLO_WHATSAPP_API_URL?: string;
   ZENVLO_WHATSAPP_API_KEY?: string;
   WHATSAPP_VERIFY_TOKEN?: string;
+  TRUST_PROXY?: string;
+  RATE_LIMIT_ENABLED?: string;
+  RATE_LIMIT_GLOBAL_LIMIT?: number;
+  RATE_LIMIT_GLOBAL_TTL?: number;
+  RATE_LIMIT_AUTH_LOGIN_LIMIT?: number;
+  RATE_LIMIT_AUTH_LOGIN_TTL?: number;
+  RATE_LIMIT_AUTH_SIGNUP_LIMIT?: number;
+  RATE_LIMIT_AUTH_SIGNUP_TTL?: number;
+  RATE_LIMIT_UPLOAD_LIMIT?: number;
+  RATE_LIMIT_UPLOAD_TTL?: number;
+  RATE_LIMIT_PUBLIC_FORM_LIMIT?: number;
+  RATE_LIMIT_PUBLIC_FORM_TTL?: number;
   [key: string]: any;
 }
 

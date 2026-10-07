@@ -21,6 +21,7 @@ import { RequestModule } from './modules/Request/Request.module';
 import { ReviewModule } from './modules/Review/Review.module';
 import { WidgetModule } from './modules/Widget/Widget.module';
 import { BillingModule } from './modules/Billing/Billing.module';
+import { RateLimitModule } from './modules/RateLimit/RateLimit.module';
 
 import { validateEnvironment } from './config/env.validation';
 
@@ -98,6 +99,7 @@ import { validateEnvironment } from './config/env.validation';
     ReviewModule,
     WidgetModule,
     BillingModule,
+    RateLimitModule,
   ],
 })
 export class AppModule implements NestModule {
