@@ -21,6 +21,18 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 255, select: false })
   password_hash: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+  password_reset_token_hash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, select: false })
+  password_reset_expires_at: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+  refresh_token_hash: string | null;
+
+  @Column({ type: 'int', default: 1 })
+  token_version: number;
+
   @Column({ type: 'varchar', length: 120, nullable: true })
   first_name: string | null;
 

@@ -25,7 +25,7 @@ export class UserService {
       throw new ConflictException(`User with email '${dto.email}' already exists`);
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     const password_hash = await bcrypt.hash(dto.password, salt);
 
     const user = new User();

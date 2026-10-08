@@ -114,6 +114,9 @@ export class RateLimitService implements OnModuleDestroy {
     authLoginIp: { limit: 10, ttl: 900 }, // 10 attempts per 15 mins per IP
     authLoginAccount: { limit: 5, ttl: 900 }, // 5 attempts per 15 mins per target account
     authSignup: { limit: 3, ttl: 3600 }, // 3 registrations per hour per IP
+    authForgotPassword: { limit: 5, ttl: 900 }, // 5 attempts per 15 mins per IP
+    authResetPassword: { limit: 5, ttl: 900 }, // 5 attempts per 15 mins per IP
+    authRefresh: { limit: 30, ttl: 900 }, // 30 refresh requests per 15 mins per IP
     upload: { limit: 10, ttl: 600 }, // 10 uploads per 10 mins per IP
     publicForm: { limit: 10, ttl: 900 }, // 10 form submissions per 15 mins
     publicApi: { limit: 120, ttl: 60 }, // 120 reads per minute
@@ -319,6 +322,42 @@ export class RateLimitService implements OnModuleDestroy {
       key,
       this.limits.authSignup.limit,
       this.limits.authSignup.ttl,
+    );
+  }
+
+  /**
+   * Checks forgot-password request rate limit.
+   */
+  async CheckAuthForgotPassword(clientIp: string): Promise<RateLimitResult> {
+    const key = `rl:auth_forgot:ip:${clientIp}`;
+    return this.CheckLimit(
+      key,
+      this.limits.authForgotPassword.limit,
+      this.limits.authForgotPassword.ttl,
+    );
+  }
+
+  /**
+   * Checks password reset attempt rate limit.
+   */
+  async CheckAuthResetPassword(clientIp: string): Promise<RateLimitResult> {
+    const key = `rl:auth_reset:ip:${clientIp}`;
+    return this.CheckLimit(
+      key,
+      this.limits.authResetPassword.limit,
+      this.limits.authResetPassword.ttl,
+    );
+  }
+
+  /**
+   * Checks token refresh rate limit.
+   */
+  async CheckAuthRefresh(clientIp: string): Promise<RateLimitResult> {
+    const key = `rl:auth_refresh:ip:${clientIp}`;
+    return this.CheckLimit(
+      key,
+      this.limits.authRefresh.limit,
+      this.limits.authRefresh.ttl,
     );
   }
 
