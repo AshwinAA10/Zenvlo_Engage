@@ -167,6 +167,18 @@ export class RateLimitGuard implements CanActivate {
       return this.rateLimitService.CheckAuthSignup(clientIp);
     }
 
+    if (rawUrl.endsWith('/auth/forgot-password') && method === 'POST') {
+      return this.rateLimitService.CheckAuthForgotPassword(clientIp);
+    }
+
+    if (rawUrl.endsWith('/auth/reset-password') && method === 'POST') {
+      return this.rateLimitService.CheckAuthResetPassword(clientIp);
+    }
+
+    if (rawUrl.endsWith('/auth/refresh') && method === 'POST') {
+      return this.rateLimitService.CheckAuthRefresh(clientIp);
+    }
+
     // 2. Storage upload
     if (rawUrl.endsWith('/storage/upload') && method === 'POST') {
       return this.rateLimitService.CheckUpload(clientIp);

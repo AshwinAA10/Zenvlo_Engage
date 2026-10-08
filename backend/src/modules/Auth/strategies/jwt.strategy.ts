@@ -12,6 +12,7 @@ export interface JwtPayload {
   email: string;
   business_id?: string | null;
   workspaces?: string[];
+  token_version?: number;
 }
 
 @Injectable()
@@ -33,6 +34,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await User.findOne({ where: { id: payload.sub, status: 1 } });
     if (!user) {
       throw new UnauthorizedException('User account inactive or not found');
+    }
+
+    if (
+      payload.token_version !== undefined &&
+      user.token_version !== undefined &&
+      user.token_version !== payload.token_version
+    ) {
+      throw new UnauthorizedException('Token has been revoked');
     }
 
     const business = await Business.findOne({

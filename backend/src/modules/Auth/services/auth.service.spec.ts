@@ -55,11 +55,15 @@ describe('AuthService', () => {
     expect(result.access_token).toBe('mock_jwt_token_123');
     expect(result.user.email).toBe('dr.rao@clinic.com');
     expect(result.business?.name).toBe('Dr. Rao Dental Clinic');
-    expect(mockJwtService.sign).toHaveBeenCalledWith({
-      sub: 'usr-new-1',
-      email: 'dr.rao@clinic.com',
-      business_id: 'bus-new-1',
-    });
+    expect(mockJwtService.sign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 'usr-new-1',
+        email: 'dr.rao@clinic.com',
+        business_id: 'bus-new-1',
+        token_version: 1,
+      }),
+      expect.any(Object),
+    );
   });
 
   it('should throw ConflictException if email is already taken', async () => {
