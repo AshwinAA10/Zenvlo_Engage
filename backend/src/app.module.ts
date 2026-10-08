@@ -21,12 +21,16 @@ import { RequestModule } from './modules/Request/Request.module';
 import { ReviewModule } from './modules/Review/Review.module';
 import { WidgetModule } from './modules/Widget/Widget.module';
 import { BillingModule } from './modules/Billing/Billing.module';
+import { RateLimitModule } from './modules/RateLimit/RateLimit.module';
+
+import { validateEnvironment } from './config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.local'],
+      validate: validateEnvironment,
     }),
 
     LoggerModule.forRootAsync({
@@ -50,9 +54,14 @@ import { BillingModule } from './modules/Billing/Billing.module';
             'req.headers.authorization',
             'req.headers.cookie',
             'body.password',
+            'body.new_password',
             'body.token',
             'body.secret_key',
             'body.access_token',
+            'body.refresh_token',
+            'body.razorpay_signature',
+            'req.headers["x-razorpay-signature"]',
+            'req.headers["x-razorpay-event-id"]',
           ],
         },
       }),
@@ -95,6 +104,7 @@ import { BillingModule } from './modules/Billing/Billing.module';
     ReviewModule,
     WidgetModule,
     BillingModule,
+    RateLimitModule,
   ],
 })
 export class AppModule implements NestModule {

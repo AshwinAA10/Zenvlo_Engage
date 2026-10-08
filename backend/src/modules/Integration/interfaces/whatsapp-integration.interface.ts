@@ -12,6 +12,8 @@ export interface ISendTestimonialRequestResult {
   messageId?: string;
   status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'FAILED' | 'PENDING_CONTRACT';
   errorMessage?: string;
+  provider?: string;
+  statusCode?: number;
 }
 
 export interface IWhatsAppIntegrationService {

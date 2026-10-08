@@ -10,7 +10,10 @@ import { HttpExceptionFilter } from './filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: false }),
+    new FastifyAdapter({
+      logger: false,
+      bodyLimit: 50 * 1024 * 1024, // 50MB maximum request body ceiling
+    }),
     { bufferLogs: true },
   );
 
@@ -34,6 +37,10 @@ async function bootstrap() {
       'Authorization',
       'x-request-id',
       'x-razorpay-signature',
+      'x-hub-signature-256',
+      'x-hub-timestamp',
+      'x-zenvlo-signature',
+      'x-zenvlo-timestamp',
     ],
   });
 

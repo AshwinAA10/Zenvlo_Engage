@@ -3,7 +3,12 @@ import { TenantBaseEntity } from '../../../database/tenant-base.entity';
 
 export type PlanType = 'FREE' | 'GROWTH' | 'ENTERPRISE';
 export type BillingCycle = 'MONTHLY' | 'YEARLY';
-export type SubscriptionStatus = 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+export type SubscriptionStatus =
+  | 'ACTIVE'
+  | 'PAST_DUE'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'HALTED';
 
 @Entity('subscriptions')
 @Index(['business_id'])

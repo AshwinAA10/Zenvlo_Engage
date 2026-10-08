@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { SkipRateLimit } from '../../RateLimit/decorators/rate-limit.decorator';
 
 @ApiTags('System')
+@SkipRateLimit()
 @Controller('health')
 export class HealthController {
   @Get()

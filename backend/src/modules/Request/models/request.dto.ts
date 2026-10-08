@@ -111,6 +111,15 @@ export class WhatsAppWebhookDto {
   @IsOptional()
   @IsString()
   error_message?: string;
+
+  @ApiPropertyOptional({ description: 'Optional Business UUID for tenant isolation verification' })
+  @IsOptional()
+  @IsUUID()
+  business_id?: string;
+
+  @ApiPropertyOptional({ description: 'Event timestamp' })
+  @IsOptional()
+  timestamp?: string | number;
 }
 
 export class RequestStatsDto {

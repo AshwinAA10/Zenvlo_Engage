@@ -26,6 +26,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let errorDetails: any = null;
 
+    let retryAfter: number | undefined;
+
     if (exception instanceof HttpException) {
       const exceptionResponse = exception.getResponse();
       if (typeof exceptionResponse === 'string') {
@@ -36,6 +38,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ) {
         message = (exceptionResponse as any).message || exception.message;
         errorDetails = (exceptionResponse as any).errors || null;
+        if ((exceptionResponse as any).retryAfter !== undefined) {
+          retryAfter = (exceptionResponse as any).retryAfter;
+          if (typeof response.header === 'function') {
+            response.header('Retry-After', String(retryAfter));
+          } else if (typeof response.setHeader === 'function') {
+            response.setHeader('Retry-After', String(retryAfter));
+          }
+        }
       }
     } else if (exception instanceof Error) {
       this.logger.error(
@@ -54,6 +64,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url || request.raw?.url,
       message,
+      ...(retryAfter !== undefined ? { retryAfter } : {}),
       ...(errorDetails ? { errors: errorDetails } : {}),
     };
 

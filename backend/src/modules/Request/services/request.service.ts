@@ -4,7 +4,9 @@ import {
   Optional,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import { RequestLog, RequestStatus } from '../entities/request-log.entity';
 import { Customer } from '../../Customer/entities/customer.entity';
@@ -21,17 +23,34 @@ import {
   IWhatsAppIntegrationService,
 } from '../../Integration/interfaces/whatsapp-integration.interface';
 import { UsageService } from '../../Billing/services/usage.service';
+import { WebhookSecurityService } from '../../Webhook/services/webhook-security.service';
+
+const STATUS_RANK: Record<string, number> = {
+  QUEUED: 1,
+  SENT: 2,
+  DELIVERED: 3,
+  READ: 4,
+};
 
 @Injectable()
 export class RequestService {
+  private readonly webhookSecurity: WebhookSecurityService;
+
   constructor(
     private readonly logger: PinoLogger,
     @Inject(WHATSAPP_INTEGRATION_SERVICE)
     private readonly whatsappService: IWhatsAppIntegrationService,
     @Optional()
     private readonly usageService?: UsageService,
+    @Optional()
+    webhookSecurityService?: WebhookSecurityService,
+    @Optional()
+    private readonly configService?: ConfigService,
   ) {
     this.logger.setContext(RequestService.name);
+    this.webhookSecurity =
+      webhookSecurityService ||
+      new WebhookSecurityService(this.logger, this.configService);
   }
 
   async SendSingleRequest(
@@ -86,6 +105,11 @@ export class RequestService {
       customMessage: dto.custom_message,
     });
 
+    const isSuccess = integrationResult.success;
+    const deliveryStatus = isSuccess
+      ? (integrationResult.status as RequestStatus)
+      : 'FAILED';
+
     const log = new RequestLog();
     log.business_id = businessId;
     log.customer_id = customer ? customer.id : null;
@@ -95,35 +119,45 @@ export class RequestService {
     log.template_name = 'testimonial_request';
     log.testimonial_url = testimonialUrl;
     log.custom_message = dto.custom_message || null;
-    log.delivery_status = integrationResult.status as RequestStatus;
-    log.message_id = integrationResult.messageId || null;
-    log.error_message = integrationResult.errorMessage || null;
+    log.delivery_status = deliveryStatus;
+    log.message_id =
+      isSuccess && integrationResult.messageId
+        ? integrationResult.messageId
+        : null;
+    log.error_message = isSuccess
+      ? null
+      : integrationResult.errorMessage ||
+        'Provider failed to send WhatsApp message';
     log.sent_at = new Date();
 
     if (
-      integrationResult.status === 'DELIVERED' ||
-      integrationResult.status === 'SENT'
+      isSuccess &&
+      (integrationResult.status === 'DELIVERED' ||
+        integrationResult.status === 'SENT')
     ) {
       log.delivered_at = new Date();
     }
 
     const savedLog = await log.save();
 
-    if (customer) {
+    if (customer && isSuccess) {
       customer.last_request_sent_at = new Date();
       customer.request_count = (customer.request_count || 0) + 1;
       await customer.save();
     }
 
     this.logger.info({
-      msg: 'WhatsApp testimonial request logged',
+      msg: isSuccess
+        ? 'WhatsApp testimonial request logged'
+        : 'WhatsApp testimonial request failed',
       businessId,
       customerId: log.customer_id,
       deliveryStatus: log.delivery_status,
       messageId: log.message_id,
+      errorMessage: log.error_message,
     });
 
-    if (this.usageService) {
+    if (this.usageService && isSuccess) {
       await this.usageService.IncrementWhatsAppUsage(businessId);
     }
 
@@ -154,7 +188,11 @@ export class RequestService {
           custom_message: dto.custom_message,
         });
         logs.push(log);
-        queued++;
+        if (log.delivery_status === 'FAILED') {
+          failed++;
+        } else {
+          queued++;
+        }
       } catch (err: any) {
         this.logger.error({
           msg: 'Failed to send batch request to customer',
@@ -240,9 +278,13 @@ export class RequestService {
       if (log.testimonial_id) feedback_received++;
     }
 
+    const isProduction = process.env.NODE_ENV === 'production';
     const delivery_rate =
       total_sent > 0
-        ? Math.round(((delivered + pending_contract) / total_sent) * 100)
+        ? Math.round(
+            ((delivered + (isProduction ? 0 : pending_contract)) / total_sent) *
+              100,
+          )
         : 100;
 
     const feedback_conversion_rate =
@@ -260,40 +302,141 @@ export class RequestService {
     };
   }
 
-  async HandleWebhook(dto: WhatsAppWebhookDto): Promise<{ updated: boolean }> {
-    const log = await RequestLog.findOne({
-      where: { message_id: dto.message_id },
-    });
+  async HandleWebhook(
+    dto: WhatsAppWebhookDto,
+    securityContext?: {
+      signature?: string;
+      timestamp?: string | number;
+      rawBody?: string;
+    },
+  ): Promise<{ updated: boolean; ignored?: boolean; duplicate?: boolean; reason?: string }> {
+    const rawBody = securityContext?.rawBody || JSON.stringify(dto);
 
-    if (!log) {
-      this.logger.warn({
-        msg: 'Webhook received for unknown message_id',
-        messageId: dto.message_id,
-      });
-      return { updated: false };
+    // 1. Payload size check
+    this.webhookSecurity.ValidatePayloadSize(rawBody);
+
+    const isProduction =
+      (this.configService?.get<string>('NODE_ENV') || process.env.NODE_ENV) ===
+      'production';
+
+    // 2. Secret resolution
+    const secret =
+      this.configService?.get<string>('ZENVLO_WHATSAPP_WEBHOOK_SECRET') ||
+      process.env.ZENVLO_WHATSAPP_WEBHOOK_SECRET ||
+      this.configService?.get<string>('ZENVLO_WHATSAPP_API_KEY') ||
+      process.env.ZENVLO_WHATSAPP_API_KEY;
+
+    // 3. Signature verification (mandatory in production or when signature provided)
+    if (isProduction || securityContext?.signature) {
+      this.webhookSecurity.VerifySignature(
+        rawBody,
+        securityContext?.signature,
+        secret,
+        'Zenvlo WhatsApp Webhook',
+      );
     }
 
-    const uppercaseStatus = dto.status.toUpperCase();
-    if (
-      ['QUEUED', 'SENT', 'DELIVERED', 'READ', 'FAILED'].includes(
-        uppercaseStatus,
-      )
-    ) {
+    // 4. Timestamp & Replay verification
+    const eventTimestamp = securityContext?.timestamp || dto.timestamp;
+    if (eventTimestamp !== undefined && eventTimestamp !== null) {
+      this.webhookSecurity.ValidateTimestamp(
+        eventTimestamp,
+        undefined,
+        'Zenvlo WhatsApp Webhook',
+      );
+    } else if (isProduction) {
+      throw new BadRequestException('Missing webhook timestamp in production');
+    }
+
+    const uppercaseStatus = (dto.status || '').toUpperCase();
+    if (!['QUEUED', 'SENT', 'DELIVERED', 'READ', 'FAILED'].includes(uppercaseStatus)) {
+      throw new BadRequestException(`Invalid delivery status: ${dto.status}`);
+    }
+
+    // 5. Idempotent execution wrapper with in-flight lock to protect against concurrency
+    const idempotencyKey = `req_wh:${dto.message_id}:${uppercaseStatus}`;
+
+    const execution = await this.webhookSecurity.ExecuteIdempotent(idempotencyKey, async () => {
+      const log = await RequestLog.findOne({
+        where: { message_id: dto.message_id },
+      });
+
+      if (!log) {
+        this.logger.warn({
+          msg: 'Webhook received for unknown message_id',
+          messageId: dto.message_id,
+        });
+        return { updated: false, reason: 'UNKNOWN_MESSAGE_ID' };
+      }
+
+      // 6. Tenant isolation validation: if external payload includes business_id, it must match
+      if (dto.business_id && dto.business_id !== log.business_id) {
+        this.logger.warn({
+          msg: 'Tenant mismatch detected in webhook payload',
+          payloadBusinessId: dto.business_id,
+          logBusinessId: log.business_id,
+        });
+        throw new ForbiddenException('Tenant mismatch: Cross-tenant webhook tampering detected');
+      }
+
+      // 7. State machine integrity & regression check
+      const currentRank = STATUS_RANK[log.delivery_status] || 0;
+      const newRank = STATUS_RANK[uppercaseStatus] || 0;
+
+      // Duplicate delivery check at database level
+      if (log.delivery_status === uppercaseStatus) {
+        this.logger.info({
+          msg: 'Webhook delivery status already recorded',
+          messageId: dto.message_id,
+          status: uppercaseStatus,
+        });
+        return { updated: false, duplicate: true, reason: 'ALREADY_RECORDED' };
+      }
+
+      // State regression prevention
+      if (newRank > 0 && currentRank > 0 && newRank < currentRank) {
+        this.logger.warn({
+          msg: 'Ignoring out-of-order webhook status regression',
+          messageId: dto.message_id,
+          currentStatus: log.delivery_status,
+          incomingStatus: uppercaseStatus,
+        });
+        return { updated: false, ignored: true, reason: 'STATUS_REGRESSION_PREVENTED' };
+      }
+
+      // Failure state validation: cannot fail after already delivered/read
+      if (
+        uppercaseStatus === 'FAILED' &&
+        (log.delivery_status === 'DELIVERED' || log.delivery_status === 'READ')
+      ) {
+        this.logger.warn({
+          msg: 'Ignoring FAILED webhook status for already delivered/read message',
+          messageId: dto.message_id,
+          currentStatus: log.delivery_status,
+        });
+        return { updated: false, ignored: true, reason: 'ALREADY_DELIVERED' };
+      }
+
       log.delivery_status = uppercaseStatus as RequestStatus;
       if (uppercaseStatus === 'DELIVERED' && !log.delivered_at) {
         log.delivered_at = new Date();
       }
-      if (uppercaseStatus === 'READ' && !log.read_at) {
-        log.read_at = new Date();
+      if (uppercaseStatus === 'READ') {
+        if (!log.delivered_at) log.delivered_at = new Date();
+        if (!log.read_at) log.read_at = new Date();
       }
-    }
+      if (dto.error_message) {
+        log.error_message = dto.error_message;
+      }
 
-    if (dto.error_message) {
-      log.error_message = dto.error_message;
-    }
+      await log.save();
+      return { updated: true };
+    });
 
-    await log.save();
-    return { updated: true };
+    if (execution.duplicate) {
+      return { updated: false, duplicate: true, reason: 'CONCURRENT_OR_PROCESSED_DUPLICATE' };
+    }
+    return execution.result || { updated: false };
   }
 
   async LinkTestimonialFeedback(

@@ -156,4 +156,48 @@ describe('RequestService', () => {
     expect(mockLog.delivered_at).toBeDefined();
     expect(mockLog.save).toHaveBeenCalled();
   });
+
+  it('should handle provider failure securely without saving fake message IDs or incrementing quota', async () => {
+    jest.spyOn(Business, 'findOne').mockResolvedValue({
+      id: 'biz-1',
+      name: 'Spa Luxe',
+      slug: 'spa-luxe',
+    } as any);
+
+    const mockCustomer = {
+      id: 'cust-1',
+      business_id: 'biz-1',
+      name: 'Ananya Roy',
+      phone: '+919988776655',
+      request_count: 0,
+      last_request_sent_at: null,
+      save: jest.fn().mockResolvedValue(true),
+    };
+    jest.spyOn(Customer, 'findOne').mockResolvedValue(mockCustomer as any);
+
+    const mockSave = jest.fn().mockImplementation(function (this: any) {
+      this.id = 'log-failed-1';
+      return Promise.resolve(this);
+    });
+    jest.spyOn(RequestLog.prototype, 'save').mockImplementation(mockSave);
+
+    // Simulate provider failure
+    (whatsappService.SendTestimonialRequest as jest.Mock).mockResolvedValueOnce({
+      success: false,
+      status: 'FAILED',
+      errorMessage: 'Provider rate limit exceeded',
+    });
+
+    const result = await service.SendSingleRequest('biz-1', {
+      customer_id: 'cust-1',
+    });
+
+    expect(result.delivery_status).toBe('FAILED');
+    expect(result.message_id).toBeNull();
+    expect(result.error_message).toBe('Provider rate limit exceeded');
+    expect(result.delivered_at).toBeUndefined();
+    // Customer quota/request count must NOT increment on failure
+    expect(mockCustomer.request_count).toBe(0);
+    expect(mockCustomer.save).not.toHaveBeenCalled();
+  });
 });

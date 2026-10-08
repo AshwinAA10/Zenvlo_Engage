@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import {
   IGooglePlacesService,
@@ -10,8 +10,18 @@ import {
 @Injectable()
 export class GooglePlacesService implements IGooglePlacesService {
   private readonly apiKey: string | undefined;
+  private readonly logger: PinoLogger;
 
-  constructor(private readonly logger: PinoLogger) {
+  constructor(@Optional() logger?: PinoLogger) {
+    this.logger =
+      logger ||
+      ({
+        setContext: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+      } as any);
     this.logger.setContext(GooglePlacesService.name);
     this.apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!this.apiKey) {

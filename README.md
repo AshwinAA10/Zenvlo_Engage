@@ -238,6 +238,11 @@ npm run migration:revert
 6. **Structured Observability**:
    - Zero `console.log` permitted in code. Always use `PinoLogger`.
 
+7. **Production WhatsApp Provider Enforcement (Phase 9A)**:
+   - In production (`NODE_ENV=production`), the application strictly mandates the real `ZenvloWhatsAppService` (`WHATSAPP_PROVIDER=zenvlo`).
+   - Mock, sandbox, or development providers are strictly prohibited in production and trigger fatal bootstrap/runtime errors.
+   - Production messaging fails closed if `ZENVLO_WHATSAPP_API_URL` or `ZENVLO_WHATSAPP_API_KEY` are missing or invalid. Synthetic message IDs or simulated successes are strictly forbidden.
+
 ---
 
 ## 8. Development Workflow
