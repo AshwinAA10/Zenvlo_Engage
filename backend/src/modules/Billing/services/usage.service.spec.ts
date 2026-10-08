@@ -115,6 +115,76 @@ describe('UsageService', () => {
     });
   });
 
+  describe('CheckCanCreateTestimonial', () => {
+    it('should allow creating testimonial when under Free tier limit (0 testimonials)', async () => {
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'FREE',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(0);
+
+      const result = await service.CheckCanCreateTestimonial(mockBusinessId);
+      expect(result).toBe(true);
+    });
+
+    it('should allow creating testimonial #20 when Free tier has 19 testimonials', async () => {
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'FREE',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(19);
+
+      const result = await service.CheckCanCreateTestimonial(mockBusinessId);
+      expect(result).toBe(true);
+    });
+
+    it('should throw ForbiddenException when Free tier has reached 20 testimonials', async () => {
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'FREE',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(20);
+
+      await expect(
+        service.CheckCanCreateTestimonial(mockBusinessId),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        service.CheckCanCreateTestimonial(mockBusinessId),
+      ).rejects.toThrow(
+        'You have reached the maximum allowed testimonials (20) for the FREE plan. Upgrade to Growth for unlimited testimonials.',
+      );
+    });
+
+    it('should throw ForbiddenException when Free tier has 21+ testimonials', async () => {
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'FREE',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(21);
+
+      await expect(
+        service.CheckCanCreateTestimonial(mockBusinessId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow unlimited testimonials on Growth plan', async () => {
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'GROWTH',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(50);
+
+      const result = await service.CheckCanCreateTestimonial(mockBusinessId);
+      expect(result).toBe(true);
+    });
+
+    it('should allow unlimited testimonials on Enterprise plan', async () => {
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'ENTERPRISE',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(200);
+
+      const result = await service.CheckCanCreateTestimonial(mockBusinessId);
+      expect(result).toBe(true);
+    });
+  });
+
   describe('GetUsageStats', () => {
     it('should return aggregated usage metrics', async () => {
       jest.spyOn(Usage, 'findOne').mockResolvedValue({

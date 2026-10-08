@@ -90,6 +90,33 @@ export class UsageService {
     return true;
   }
 
+  async CheckCanCreateTestimonial(businessId: string): Promise<boolean> {
+    const sub = await Subscription.findOne({
+      where: { business_id: businessId, subscription_status: 'ACTIVE' },
+    });
+    const plan = sub?.plan || 'FREE';
+    const testimonialLimit = PLAN_CONFIGS[plan]?.features?.testimonials_limit;
+
+    if (testimonialLimit !== null && testimonialLimit !== undefined) {
+      const currentCount = await Testimonial.count({
+        where: { business_id: businessId },
+      });
+      if (currentCount >= testimonialLimit) {
+        this.logger.warn({
+          msg: 'Testimonial limit reached for business',
+          businessId,
+          plan,
+          currentCount,
+          limit: testimonialLimit,
+        });
+        throw new ForbiddenException(
+          `You have reached the maximum allowed testimonials (${testimonialLimit}) for the ${plan} plan. Upgrade to Growth for unlimited testimonials.`,
+        );
+      }
+    }
+    return true;
+  }
+
   async SyncUsageLimitForPlan(businessId: string, plan: string): Promise<void> {
     const usage = await this.GetOrCreateCurrentUsage(businessId);
     const newLimit = PLAN_CONFIGS[plan as keyof typeof PLAN_CONFIGS]?.features?.whatsapp_requests_limit || 50;

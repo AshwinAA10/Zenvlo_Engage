@@ -75,4 +75,85 @@ describe('TestimonialService', () => {
     expect(approved.approved_at).toBeDefined();
     expect(approved.approved_by_id).toBe('usr-owner-1');
   });
+
+  it('should enforce quota via UsageService and reject submission when limit reached', async () => {
+    const mockUsageService = {
+      CheckCanCreateTestimonial: jest.fn().mockRejectedValue(
+        new Error(
+          'You have reached the maximum allowed testimonials (20) for the FREE plan. Upgrade to Growth for unlimited testimonials.',
+        ),
+      ),
+    } as any;
+
+    const quotaService = new TestimonialService(mockUsageService);
+
+    jest.spyOn(Business, 'findOne').mockResolvedValue({
+      id: 'bus-1',
+      slug: 'orchid-salon',
+      user_id: 'usr-owner-1',
+      status: 1,
+    } as any);
+
+    await expect(
+      quotaService.SubmitPublic('orchid-salon', {
+        rating: 5,
+        content: 'Great service!',
+        customer_name: 'Customer 21',
+        consent_given: true,
+      }),
+    ).rejects.toThrow(
+      'You have reached the maximum allowed testimonials (20) for the FREE plan. Upgrade to Growth for unlimited testimonials.',
+    );
+
+    expect(mockUsageService.CheckCanCreateTestimonial).toHaveBeenCalledWith('bus-1');
+  });
+
+  it('should serialize concurrent submissions for the same business without race conditions', async () => {
+    let callOrder: number[] = [];
+    const mockUsageService = {
+      CheckCanCreateTestimonial: jest.fn().mockImplementation(async () => {
+        // Simulating async work
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return true;
+      }),
+    } as any;
+
+    const concurrentService = new TestimonialService(mockUsageService);
+
+    jest.spyOn(Business, 'findOne').mockResolvedValue({
+      id: 'bus-concurrent',
+      slug: 'orchid-salon',
+      user_id: 'usr-owner-1',
+      status: 1,
+    } as any);
+    jest.spyOn(Customer, 'findOne').mockResolvedValue(null);
+
+    let savedCount = 0;
+    jest.spyOn(Testimonial.prototype, 'save').mockImplementation(function (this: any) {
+      savedCount++;
+      callOrder.push(savedCount);
+      this.id = `testi-${savedCount}`;
+      return Promise.resolve(this);
+    });
+
+    const [res1, res2] = await Promise.all([
+      concurrentService.SubmitPublic('orchid-salon', {
+        rating: 5,
+        content: 'Concurrent Review 1',
+        customer_name: 'User 1',
+        consent_given: true,
+      }),
+      concurrentService.SubmitPublic('orchid-salon', {
+        rating: 4,
+        content: 'Concurrent Review 2',
+        customer_name: 'User 2',
+        consent_given: true,
+      }),
+    ]);
+
+    expect(res1.success).toBe(true);
+    expect(res2.success).toBe(true);
+    expect(callOrder).toEqual([1, 2]);
+    expect(mockUsageService.CheckCanCreateTestimonial).toHaveBeenCalledTimes(2);
+  });
 });

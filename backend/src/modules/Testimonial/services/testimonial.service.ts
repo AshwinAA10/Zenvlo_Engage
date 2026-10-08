@@ -2,11 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { Testimonial, ApprovalStatus } from '../entities/testimonial.entity';
 import { Business } from '../../Business/entities/business.entity';
 import { Customer } from '../../Customer/entities/customer.entity';
 import { RequestLog } from '../../Request/entities/request-log.entity';
+import { UsageService } from '../../Billing/services/usage.service';
 import {
   SubmitPublicTestimonialDto,
   UpdateTestimonialStatusDto,
@@ -15,6 +17,14 @@ import {
 
 @Injectable()
 export class TestimonialService {
+  // In-flight mutex per business to serialize concurrent submissions and prevent quota bypass
+  private readonly inFlightCreationLocks = new Map<string, Promise<any>>();
+
+  constructor(
+    @Optional()
+    private readonly usageService?: UsageService,
+  ) {}
+
   async SubmitPublic(
     slug: string,
     dto: SubmitPublicTestimonialDto,
@@ -31,67 +41,88 @@ export class TestimonialService {
       throw new BadRequestException('Customer consent is required to submit feedback');
     }
 
-    let customerId: string | null = null;
-    if (dto.customer_phone) {
-      const cleanPhone = dto.customer_phone.replace(/[^\d+]/g, '').trim();
-      const existingCustomer = await Customer.findOne({
-        where: { business_id: business.id, phone: cleanPhone, status: 1 },
-      });
-      if (existingCustomer) {
-        customerId = existingCustomer.id;
-      }
+    // In-flight mutex per business to serialize concurrent submissions and prevent quota bypass
+    const lockKey = business.id;
+    while (this.inFlightCreationLocks.has(lockKey)) {
+      await this.inFlightCreationLocks.get(lockKey);
     }
 
-    const testimonial = new Testimonial();
-    testimonial.business_id = business.id;
-    testimonial.customer_id = customerId;
-    testimonial.customer_name = dto.customer_name.trim();
-    testimonial.customer_phone = dto.customer_phone
-      ? dto.customer_phone.replace(/[^\d+]/g, '').trim()
-      : null;
-    testimonial.customer_email = dto.customer_email
-      ? dto.customer_email.trim().toLowerCase()
-      : null;
-    testimonial.rating = dto.rating;
-    testimonial.content = dto.content.trim();
-    testimonial.photo_url = dto.photo_url || null;
-    testimonial.video_url = dto.video_url || null;
-    testimonial.consent_given = true;
-    testimonial.consent_timestamp = new Date();
-    testimonial.approval_status = 'PENDING';
-    testimonial.source = 'PUBLIC_FORM';
-    testimonial.created_by_id = business.user_id;
-    testimonial.updated_by_id = business.user_id;
+    let releaseLock!: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    this.inFlightCreationLocks.set(lockKey, lockPromise);
 
-    await testimonial.save();
+    try {
+      if (this.usageService) {
+        await this.usageService.CheckCanCreateTestimonial(business.id);
+      }
 
-    // Link feedback with pending WhatsApp request log if matched
-    if (testimonial.customer_phone) {
-      try {
-        const unlinkedLog = await RequestLog.createQueryBuilder('log')
-          .where('log.business_id = :businessId', { businessId: business.id })
-          .andWhere('log.customer_phone = :phone', {
-            phone: testimonial.customer_phone,
-          })
-          .andWhere('log.testimonial_id IS NULL')
-          .orderBy('log.created_on', 'DESC')
-          .getOne();
-
-        if (unlinkedLog) {
-          unlinkedLog.testimonial_id = testimonial.id;
-          unlinkedLog.response_received_at = new Date();
-          await unlinkedLog.save();
+      let customerId: string | null = null;
+      if (dto.customer_phone) {
+        const cleanPhone = dto.customer_phone.replace(/[^\d+]/g, '').trim();
+        const existingCustomer = await Customer.findOne({
+          where: { business_id: business.id, phone: cleanPhone, status: 1 },
+        });
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
         }
-      } catch {
-        // Silently continue if log linking fails
       }
-    }
 
-    return {
-      success: true,
-      message: 'Your review has been submitted for review. Thank you!',
-      id: testimonial.id,
-    };
+      const testimonial = new Testimonial();
+      testimonial.business_id = business.id;
+      testimonial.customer_id = customerId;
+      testimonial.customer_name = dto.customer_name.trim();
+      testimonial.customer_phone = dto.customer_phone
+        ? dto.customer_phone.replace(/[^\d+]/g, '').trim()
+        : null;
+      testimonial.customer_email = dto.customer_email
+        ? dto.customer_email.trim().toLowerCase()
+        : null;
+      testimonial.rating = dto.rating;
+      testimonial.content = dto.content.trim();
+      testimonial.photo_url = dto.photo_url || null;
+      testimonial.video_url = dto.video_url || null;
+      testimonial.consent_given = true;
+      testimonial.consent_timestamp = new Date();
+      testimonial.approval_status = 'PENDING';
+      testimonial.source = 'PUBLIC_FORM';
+      testimonial.created_by_id = business.user_id;
+      testimonial.updated_by_id = business.user_id;
+
+      await testimonial.save();
+
+      // Link feedback with pending WhatsApp request log if matched
+      if (testimonial.customer_phone) {
+        try {
+          const unlinkedLog = await RequestLog.createQueryBuilder('log')
+            .where('log.business_id = :businessId', { businessId: business.id })
+            .andWhere('log.customer_phone = :phone', {
+              phone: testimonial.customer_phone,
+            })
+            .andWhere('log.testimonial_id IS NULL')
+            .orderBy('log.created_on', 'DESC')
+            .getOne();
+
+          if (unlinkedLog) {
+            unlinkedLog.testimonial_id = testimonial.id;
+            unlinkedLog.response_received_at = new Date();
+            await unlinkedLog.save();
+          }
+        } catch {
+          // Silently continue if log linking fails
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Your review has been submitted for review. Thank you!',
+        id: testimonial.id,
+      };
+    } finally {
+      this.inFlightCreationLocks.delete(lockKey);
+      releaseLock();
+    }
   }
 
   async GetAll(
