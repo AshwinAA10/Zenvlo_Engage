@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { BillingService } from './billing.service';
 import { UsageService } from './usage.service';
 import { Subscription } from '../entities/subscription.entity';
+import { Payment } from '../entities/payment.entity';
 import { RAZORPAY_SERVICE } from '../../Integration/interfaces/razorpay.interface';
 
 describe('BillingService', () => {
@@ -64,6 +65,8 @@ describe('BillingService', () => {
 
     service = module.get<BillingService>(BillingService);
     jest.clearAllMocks();
+    jest.spyOn(Payment.prototype, 'save').mockResolvedValue({} as any);
+    jest.spyOn(Payment, 'findOne').mockResolvedValue(null);
   });
 
   describe('GetOrCreateSubscription', () => {

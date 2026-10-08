@@ -22,9 +22,21 @@ export interface VerifyPaymentParams {
   signature: string;
 }
 
+export interface RazorpayPaymentDetails {
+  id: string;
+  order_id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  method?: string;
+  error_code?: string;
+  error_description?: string;
+}
+
 export interface IRazorpayService {
   createOrder(params: CreateOrderParams): Promise<RazorpayOrderResult>;
   verifyPaymentSignature(params: VerifyPaymentParams): boolean;
   verifyWebhookSignature(rawBody: string, signature: string): boolean;
   getKeyId(): string;
+  fetchPayment?(paymentId: string): Promise<RazorpayPaymentDetails | null>;
 }

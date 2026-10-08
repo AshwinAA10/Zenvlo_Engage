@@ -60,8 +60,9 @@ export class BillingController {
   async webhook(
     @Body() body: any,
     @Headers('x-razorpay-signature') signature: string,
+    @Headers('x-razorpay-event-id') eventIdHeader?: string,
   ) {
     const rawBody = typeof body === 'string' ? body : JSON.stringify(body);
-    return this.billingService.HandleWebhook(rawBody, signature || '');
+    return this.billingService.HandleWebhook(rawBody, signature || '', eventIdHeader);
   }
 }
