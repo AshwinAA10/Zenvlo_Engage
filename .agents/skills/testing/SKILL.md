@@ -30,14 +30,37 @@ Zenvlo Engage requires thorough test coverage across three layers:
   ```bash
   npm --prefix backend run test:e2e
   ```
-- Frontend Tests:
+- Frontend Unit & Component Tests (Vitest):
   ```bash
   npm --prefix frontend run test
+  npm --prefix frontend run test:watch
+  npm --prefix frontend run test:coverage
+  ```
+- Frontend E2E Tests (Playwright):
+  ```bash
+  # Prerequisite: ensure browsers are installed (one-time setup)
+  npx --prefix frontend playwright install chromium
+
+  # Run E2E tests headless against Next.js dev server
+  npm --prefix frontend run test:e2e
+
+  # Run E2E tests with interactive Playwright UI
+  npm --prefix frontend run test:e2e:ui
+  ```
+- Complete Frontend Test Suite:
+  ```bash
+  npm --prefix frontend run test:all
   ```
 
 ---
 
 ## 3. Mocking & Test Isolation
-- Use NestJS `@nestjs/testing` module for building isolated test contexts.
-- Mock `ClsService` to provide deterministic `workspace_id` and `user_id` context values during service unit tests.
-- For TypeORM Active Record unit tests, utilize in-memory SQLite/Postgres test containers or spy on static Active Record methods (`find`, `findOne`, `save`).
+- **Backend**:
+  - Use NestJS `@nestjs/testing` module for building isolated test contexts.
+  - Mock `ClsService` to provide deterministic `workspace_id` and `user_id` context values during service unit tests.
+  - For TypeORM Active Record unit tests, utilize in-memory SQLite/Postgres test containers or spy on static Active Record methods (`find`, `findOne`, `save`).
+- **Frontend**:
+  - Use `renderWithProviders()` from `@test/utils/renderWithProviders` to mount components within isolated `QueryClientProvider` and `useAuthStore` instances.
+  - Reset Zustand `useAuthStore` and clear `localStorage` in `test/setup.ts` before each test.
+  - In Playwright E2E tests, execute against `http://localhost:3000` with automatic Next.js server initialization managed by `playwright.config.ts`.
+
