@@ -17,6 +17,7 @@ import { WHATSAPP_INTEGRATION_SERVICE } from '../Integration/interfaces/whatsapp
 import { GOOGLE_PLACES_SERVICE } from '../Integration/interfaces/google-places.interface';
 import { RazorpayService } from '../Integration/services/razorpay.service';
 import { UsageService } from '../Billing/services/usage.service';
+import { Subscription } from '../Billing/entities/subscription.entity';
 
 describe('Security & Multi-Tenant Isolation Audit (Phase 8)', () => {
   const businessAId = 'a0000000-0000-0000-0000-000000000001';
@@ -85,6 +86,39 @@ describe('Security & Multi-Tenant Isolation Audit (Phase 8)', () => {
       await expect(
         widgetService.GetWidgetById(businessAId, 'widget-123'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('Tenant Quota Isolation: Free plan quota exhaustion on Business A (20 testimonials) does not block Business B (19 testimonials)', async () => {
+      const usageService = new UsageService(mockLogger as any);
+
+      // Both businesses on FREE plan
+      jest.spyOn(Subscription, 'findOne').mockImplementation(async (options: any) => {
+        return {
+          business_id: options?.where?.business_id,
+          plan: 'FREE',
+          subscription_status: 'ACTIVE',
+        } as any;
+      });
+
+      // Business A has reached 20 testimonials; Business B has 19 testimonials
+      jest.spyOn(Testimonial, 'count').mockImplementation(async (options: any) => {
+        if (options?.where?.business_id === businessAId) {
+          return 20;
+        }
+        if (options?.where?.business_id === businessBId) {
+          return 19;
+        }
+        return 0;
+      });
+
+      // Business A must be blocked with ForbiddenException
+      await expect(
+        usageService.CheckCanCreateTestimonial(businessAId),
+      ).rejects.toThrow(ForbiddenException);
+
+      // Business B at 19 must be allowed to create testimonial #20
+      const canBusinessBCreate = await usageService.CheckCanCreateTestimonial(businessBId);
+      expect(canBusinessBCreate).toBe(true);
     });
   });
 
