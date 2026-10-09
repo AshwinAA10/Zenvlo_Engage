@@ -208,6 +208,38 @@ describe('TestimonialService', () => {
       expect(mockSave).toHaveBeenCalledTimes(1);
     });
 
+    it('Scenario: Free tenant 18 -> create -> 19 succeeds', async () => {
+      jest.spyOn(Business, 'findOne').mockResolvedValue({
+        id: 'bus-free',
+        slug: 'orchid-salon',
+        user_id: 'usr-1',
+        status: 1,
+      } as any);
+      jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        business_id: 'bus-free',
+        plan: 'FREE',
+        subscription_status: 'ACTIVE',
+      } as any);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(18);
+
+      const mockSave = jest.fn().mockImplementation(function (this: any) {
+        this.id = 'testi-19';
+        return Promise.resolve(this);
+      });
+      jest.spyOn(Testimonial.prototype, 'save').mockImplementation(mockSave);
+
+      const result = await integratedService.SubmitPublic('orchid-salon', {
+        rating: 5,
+        content: 'Review number 19',
+        customer_name: 'Pooja',
+        consent_given: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.id).toBe('testi-19');
+      expect(mockSave).toHaveBeenCalledTimes(1);
+    });
+
     it('Scenario: Free tenant 19 -> create -> 20 succeeds (last allowed slot)', async () => {
       jest.spyOn(Business, 'findOne').mockResolvedValue({
         id: 'bus-free',
@@ -300,7 +332,7 @@ describe('TestimonialService', () => {
       expect(mockSave).not.toHaveBeenCalled();
     });
 
-    it('Scenario: Free tenant at 19 -> concurrent submissions -> exactly one succeeds, other rejected (never exceeds 20)', async () => {
+    it('Scenario: Concurrency Test - Current count = 19, multiple concurrent creation requests -> at most ONE succeeds, final count MUST NOT exceed 20', async () => {
       jest.spyOn(Business, 'findOne').mockResolvedValue({
         id: 'bus-concurrent',
         slug: 'orchid-salon',
@@ -326,28 +358,30 @@ describe('TestimonialService', () => {
         return Promise.resolve(this);
       });
 
-      const results = await Promise.allSettled([
+      // Launch a burst of 5 concurrent creation requests simultaneously
+      const burstRequests = [1, 2, 3, 4, 5].map((index) =>
         integratedService.SubmitPublic('orchid-salon', {
           rating: 5,
-          content: 'Concurrent Submission A',
-          customer_name: 'Customer A',
+          content: `Concurrent Submission #${index}`,
+          customer_name: `Customer #${index}`,
           consent_given: true,
         }),
-        integratedService.SubmitPublic('orchid-salon', {
-          rating: 4,
-          content: 'Concurrent Submission B',
-          customer_name: 'Customer B',
-          consent_given: true,
-        }),
-      ]);
+      );
+
+      const results = await Promise.allSettled(burstRequests);
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
       const rejected = results.filter((r) => r.status === 'rejected');
 
+      // CRITICAL CONCURRENCY INVARIANTS:
+      // 1. At most ONE additional testimonial is created
       expect(fulfilled.length).toBe(1);
-      expect(rejected.length).toBe(1);
-      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(ForbiddenException);
-
+      // 2. All other 4 requests fail with ForbiddenException (403)
+      expect(rejected.length).toBe(4);
+      rejected.forEach((r) => {
+        expect((r as PromiseRejectedResult).reason).toBeInstanceOf(ForbiddenException);
+      });
+      // 3. Final count MUST NOT exceed 20
       expect(currentDbCount).toBe(20);
       expect(savedTestimonials.length).toBe(1);
     });
@@ -431,7 +465,7 @@ describe('TestimonialService', () => {
       expect(mockSave).toHaveBeenCalledTimes(1);
     });
 
-    it('Scenario: Tenant isolation: Tenant A at 20 rejected, Tenant B at 5 can create', async () => {
+    it('Scenario: Tenant isolation: Tenant A (20) rejected, Tenant B (19) can create #20, zero count leakage', async () => {
       jest.spyOn(Business, 'findOne').mockImplementation(async (options: any) => {
         if (options?.where?.slug === 'tenant-a') {
           return { id: 'bus-a', slug: 'tenant-a', user_id: 'usr-a', status: 1 } as any;
@@ -450,37 +484,49 @@ describe('TestimonialService', () => {
         } as any;
       });
 
+      let countA = 20;
+      let countB = 19;
+
       jest.spyOn(Testimonial, 'count').mockImplementation(async (options: any) => {
-        if (options?.where?.business_id === 'bus-a') return 20;
-        if (options?.where?.business_id === 'bus-b') return 5;
+        if (options?.where?.business_id === 'bus-a') return countA;
+        if (options?.where?.business_id === 'bus-b') return countB;
         return 0;
       });
 
       let savedIds: string[] = [];
       jest.spyOn(Testimonial.prototype, 'save').mockImplementation(function (this: any) {
-        this.id = `testi-${this.business_id}`;
+        if (this.business_id === 'bus-b') {
+          countB++;
+        }
+        this.id = `testi-${this.business_id}-${countB}`;
         savedIds.push(this.id);
         return Promise.resolve(this);
       });
 
+      // Tenant A at 20 cannot create another
       await expect(
         integratedService.SubmitPublic('tenant-a', {
           rating: 5,
-          content: 'Tenant A review',
+          content: 'Tenant A review attempt 21',
           customer_name: 'Customer A',
           consent_given: true,
         }),
       ).rejects.toThrow(ForbiddenException);
 
+      // Tenant B at 19 CAN create testimonial #20
       const resB = await integratedService.SubmitPublic('tenant-b', {
         rating: 5,
-        content: 'Tenant B review',
+        content: 'Tenant B review #20',
         customer_name: 'Customer B',
         consent_given: true,
       });
 
       expect(resB.success).toBe(true);
-      expect(savedIds).toEqual(['testi-bus-b']);
+      expect(savedIds).toEqual(['testi-bus-b-20']);
+
+      // Tenant A's count was NOT modified by Tenant B's operations, and vice versa (zero leakage)
+      expect(countA).toBe(20);
+      expect(countB).toBe(20);
     });
 
     it('Scenario: Failed creation (e.g. database error during save) does not alter usage count', async () => {

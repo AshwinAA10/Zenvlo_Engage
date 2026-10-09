@@ -88,7 +88,7 @@ describe('Security & Multi-Tenant Isolation Audit (Phase 8)', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('Tenant Quota Isolation: Free plan quota exhaustion on Business A (20 testimonials) does not block Business B', async () => {
+    it('Tenant Quota Isolation: Free plan quota exhaustion on Business A (20 testimonials) does not block Business B (19 testimonials)', async () => {
       const usageService = new UsageService(mockLogger as any);
 
       // Both businesses on FREE plan
@@ -100,13 +100,13 @@ describe('Security & Multi-Tenant Isolation Audit (Phase 8)', () => {
         } as any;
       });
 
-      // Business A has reached 20 testimonials; Business B has only 5 testimonials
+      // Business A has reached 20 testimonials; Business B has 19 testimonials
       jest.spyOn(Testimonial, 'count').mockImplementation(async (options: any) => {
         if (options?.where?.business_id === businessAId) {
           return 20;
         }
         if (options?.where?.business_id === businessBId) {
-          return 5;
+          return 19;
         }
         return 0;
       });
@@ -116,7 +116,7 @@ describe('Security & Multi-Tenant Isolation Audit (Phase 8)', () => {
         usageService.CheckCanCreateTestimonial(businessAId),
       ).rejects.toThrow(ForbiddenException);
 
-      // Business B must be allowed to create testimonials
+      // Business B at 19 must be allowed to create testimonial #20
       const canBusinessBCreate = await usageService.CheckCanCreateTestimonial(businessBId);
       expect(canBusinessBCreate).toBe(true);
     });

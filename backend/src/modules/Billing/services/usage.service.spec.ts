@@ -6,6 +6,7 @@ import { Usage } from '../entities/usage.entity';
 import { Subscription } from '../entities/subscription.entity';
 import { Widget } from '../../Widget/entities/widget.entity';
 import { Testimonial } from '../../Testimonial/entities/testimonial.entity';
+import { PLAN_CONFIGS } from '../models/billing.dto';
 
 describe('UsageService', () => {
   let service: UsageService;
@@ -115,8 +116,14 @@ describe('UsageService', () => {
     });
   });
 
-  describe('CheckCanCreateTestimonial', () => {
-    it('should allow creating testimonial when under Free tier limit (0 testimonials)', async () => {
+  describe('CheckCanCreateTestimonial (Unit Tests for Quota Enforcement)', () => {
+    it('Free plan limit resolves to 20 from authoritative PLAN_CONFIGS', () => {
+      expect(PLAN_CONFIGS.FREE.features.testimonials_limit).toBe(20);
+      expect(PLAN_CONFIGS.GROWTH.features.testimonials_limit).toBeNull();
+      expect(PLAN_CONFIGS.ENTERPRISE.features.testimonials_limit).toBeNull();
+    });
+
+    it('Usage below limit is allowed (0 testimonials)', async () => {
       jest.spyOn(Subscription, 'findOne').mockResolvedValue({
         plan: 'FREE',
       } as any);
@@ -126,7 +133,7 @@ describe('UsageService', () => {
       expect(result).toBe(true);
     });
 
-    it('should allow creating testimonial #20 when Free tier has 19 testimonials', async () => {
+    it('Usage below limit is allowed (19 testimonials)', async () => {
       jest.spyOn(Subscription, 'findOne').mockResolvedValue({
         plan: 'FREE',
       } as any);
@@ -136,35 +143,55 @@ describe('UsageService', () => {
       expect(result).toBe(true);
     });
 
-    it('should throw ForbiddenException when Free tier has reached 20 testimonials', async () => {
+    it('Usage exactly at 20 is rejected with ForbiddenException (HTTP 403)', async () => {
       jest.spyOn(Subscription, 'findOne').mockResolvedValue({
         plan: 'FREE',
       } as any);
       jest.spyOn(Testimonial, 'count').mockResolvedValue(20);
 
-      await expect(
-        service.CheckCanCreateTestimonial(mockBusinessId),
-      ).rejects.toThrow(ForbiddenException);
+      let thrownError: any;
+      try {
+        await service.CheckCanCreateTestimonial(mockBusinessId);
+      } catch (err) {
+        thrownError = err;
+      }
 
-      await expect(
-        service.CheckCanCreateTestimonial(mockBusinessId),
-      ).rejects.toThrow(
+      expect(thrownError).toBeInstanceOf(ForbiddenException);
+      expect(thrownError.getStatus()).toBe(403);
+      expect(thrownError.message).toBe(
         'You have reached the maximum allowed testimonials (20) for the FREE plan. Upgrade to Growth for unlimited testimonials.',
       );
     });
 
-    it('should throw ForbiddenException when Free tier has 21+ testimonials', async () => {
+    it('Usage above 20 is rejected', async () => {
       jest.spyOn(Subscription, 'findOne').mockResolvedValue({
         plan: 'FREE',
       } as any);
-      jest.spyOn(Testimonial, 'count').mockResolvedValue(21);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(25);
 
       await expect(
         service.CheckCanCreateTestimonial(mockBusinessId),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow unlimited testimonials on Growth plan', async () => {
+    it('Correct tenant is evaluated in database queries', async () => {
+      const specificTenantId = 'tenant-uuid-check-1234';
+      const findSubscriptionSpy = jest.spyOn(Subscription, 'findOne').mockResolvedValue({
+        plan: 'FREE',
+      } as any);
+      const countTestimonialSpy = jest.spyOn(Testimonial, 'count').mockResolvedValue(5);
+
+      await service.CheckCanCreateTestimonial(specificTenantId);
+
+      expect(findSubscriptionSpy).toHaveBeenCalledWith({
+        where: { business_id: specificTenantId, subscription_status: 'ACTIVE' },
+      });
+      expect(countTestimonialSpy).toHaveBeenCalledWith({
+        where: { business_id: specificTenantId },
+      });
+    });
+
+    it('Paid plans (GROWTH) are not incorrectly restricted', async () => {
       jest.spyOn(Subscription, 'findOne').mockResolvedValue({
         plan: 'GROWTH',
       } as any);
@@ -174,7 +201,7 @@ describe('UsageService', () => {
       expect(result).toBe(true);
     });
 
-    it('should allow unlimited testimonials on Enterprise plan', async () => {
+    it('Paid plans (ENTERPRISE) are not incorrectly restricted', async () => {
       jest.spyOn(Subscription, 'findOne').mockResolvedValue({
         plan: 'ENTERPRISE',
       } as any);
