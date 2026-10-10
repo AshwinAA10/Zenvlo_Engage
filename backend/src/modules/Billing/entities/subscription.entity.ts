@@ -1,5 +1,12 @@
-import { Entity, Column, Index } from 'typeorm';
-import { TenantBaseEntity } from '../../../database/tenant-base.entity';
+import {
+  BaseEntity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+  Entity,
+} from 'typeorm';
 
 export type PlanType = 'FREE' | 'GROWTH' | 'ENTERPRISE';
 export type BillingCycle = 'MONTHLY' | 'YEARLY';
@@ -12,7 +19,14 @@ export type SubscriptionStatus =
 
 @Entity('subscriptions')
 @Index(['business_id'])
-export class Subscription extends TenantBaseEntity {
+export class Subscription extends BaseEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Index()
+  @Column({ type: 'uuid' })
+  business_id: string;
+
   @Column({ type: 'varchar', length: 30, default: 'FREE' })
   plan: PlanType;
 
@@ -49,4 +63,11 @@ export class Subscription extends TenantBaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   canceled_at: Date | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  created_on: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updated_on: Date;
 }
+

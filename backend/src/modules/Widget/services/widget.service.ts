@@ -29,7 +29,11 @@ export class WidgetService {
     this.logger.setContext(WidgetService.name);
   }
 
-  async CreateWidget(businessId: string, dto: CreateWidgetDto): Promise<Widget> {
+  async CreateWidget(
+    businessId: string,
+    dto: CreateWidgetDto,
+    userId?: string,
+  ): Promise<Widget> {
     if (this.usageService) {
       await this.usageService.CheckCanCreateWidget(businessId);
     }
@@ -43,6 +47,8 @@ export class WidgetService {
 
     const widget = new Widget();
     widget.business_id = businessId;
+    widget.created_by_id = userId || business.user_id;
+    widget.updated_by_id = userId || business.user_id;
     widget.name = dto.name.trim();
     widget.type = dto.type || 'WALL';
     widget.theme = dto.theme || 'DARK';
@@ -265,12 +271,19 @@ export class WidgetService {
         custom_css: widget.custom_css,
       },
       business: {
+        id: business.id,
         name: business.name,
         slug: business.slug,
         logo_url: business.logo_url,
         category: business.category,
         rating: avgRating,
         review_count: finalItems.length,
+      },
+      stats: {
+        average_rating: avgRating,
+        total_reviews: finalItems.length,
+        testimonials_count: testimonials.length,
+        google_reviews_count: 0,
       },
       items: finalItems,
     };

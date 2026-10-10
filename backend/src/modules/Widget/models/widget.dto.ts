@@ -158,12 +158,21 @@ export class PublicWidgetResponseDto {
 
   @ApiProperty()
   business: {
+    id?: string;
     name: string;
     slug: string;
     logo_url: string | null;
     category: string;
     rating: number;
     review_count: number;
+  };
+
+  @ApiPropertyOptional()
+  stats?: {
+    average_rating: number;
+    total_reviews: number;
+    testimonials_count: number;
+    google_reviews_count: number;
   };
 
   @ApiProperty()

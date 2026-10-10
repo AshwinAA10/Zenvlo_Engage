@@ -18,12 +18,12 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
     // 2. Fill in valid signup fields
     await page.getByPlaceholder('Aarav').fill('Ananya');
     await page.getByPlaceholder('Sharma').fill('Roy');
-    await page.getByPlaceholder('Green Orchid Salon & Spa').fill(businessName);
+    await page.getByPlaceholder('e.g. Lotus Wellness Clinic').fill(businessName);
     await page.getByPlaceholder('owner@business.com').fill(uniqueEmail);
     await page.getByPlaceholder('••••••••••••').fill(password);
 
     // 3. Submit signup form
-    const submitBtn = page.getByRole('button', { name: /create business account/i });
+    const submitBtn = page.getByRole('button', { name: /create free account/i });
     await expect(submitBtn).toBeEnabled();
     await submitBtn.click();
 
@@ -31,19 +31,19 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 
     // 5. Verify that tenant business context is properly initialized and rendered in sidebar
-    await expect(page.getByText(businessName)).toBeVisible();
+    await expect(page.getByText(businessName, { exact: true })).toBeVisible();
     await expect(page.getByText(uniqueEmail)).toBeVisible();
 
     // 6. Verify dashboard shell navigation is fully functional
-    await expect(page.getByRole('link', { name: /customers/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /testimonials/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Customers', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Testimonials', exact: true })).toBeVisible();
   });
 
   test('enforces client-side validation for missing and invalid signup fields', async ({ page }) => {
     await page.goto('/signup');
 
     // Attempt submitting completely empty form
-    const submitBtn = page.getByRole('button', { name: /create business account/i });
+    const submitBtn = page.getByRole('button', { name: /create free account/i });
     await submitBtn.click();
 
     // Verify all field validation error feedback
@@ -74,10 +74,10 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
     // First, register the account successfully
     await page.goto('/signup');
     await page.getByPlaceholder('Aarav').fill('First');
-    await page.getByPlaceholder('Green Orchid Salon & Spa').fill('First Business');
+    await page.getByPlaceholder('e.g. Lotus Wellness Clinic').fill('First Business');
     await page.getByPlaceholder('owner@business.com').fill(existingEmail);
     await page.getByPlaceholder('••••••••••••').fill(password);
-    await page.getByRole('button', { name: /create business account/i }).click();
+    await page.getByRole('button', { name: /create free account/i }).click();
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 
     // Log out back to auth state
@@ -88,11 +88,11 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
     // Attempt registering again with the exact same email
     await page.goto('/signup');
     await page.getByPlaceholder('Aarav').fill('Second');
-    await page.getByPlaceholder('Green Orchid Salon & Spa').fill('Second Business');
+    await page.getByPlaceholder('e.g. Lotus Wellness Clinic').fill('Second Business');
     await page.getByPlaceholder('owner@business.com').fill(existingEmail);
     await page.getByPlaceholder('••••••••••••').fill(password);
 
-    const submitBtn = page.getByRole('button', { name: /create business account/i });
+    const submitBtn = page.getByRole('button', { name: /create free account/i });
     await submitBtn.click();
 
     // Verify error banner feedback
@@ -114,10 +114,10 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
     // Register user
     await page.goto('/signup');
     await page.getByPlaceholder('Aarav').fill('Test');
-    await page.getByPlaceholder('Green Orchid Salon & Spa').fill(businessName);
+    await page.getByPlaceholder('e.g. Lotus Wellness Clinic').fill(businessName);
     await page.getByPlaceholder('owner@business.com').fill(email);
     await page.getByPlaceholder('••••••••••••').fill(password);
-    await page.getByRole('button', { name: /create business account/i }).click();
+    await page.getByRole('button', { name: /create free account/i }).click();
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 
     // Sign out
@@ -131,7 +131,7 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
 
     // Verify success redirect and business profile recovery
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
-    await expect(page.getByText(businessName)).toBeVisible();
+    await expect(page.getByText(businessName, { exact: true })).toBeVisible();
     await expect(page.getByText(email)).toBeVisible();
   });
 
@@ -146,7 +146,7 @@ test.describe('Zenvlo CRM Signup and Authentication E2E', () => {
 
     // Verify error alert banner
     await expect(
-      page.getByText(/invalid credentials|authentication failed/i)
+      page.getByText(/invalid email or password|invalid credentials|authentication failed/i)
     ).toBeVisible();
 
     // Verify button is re-enabled and route remains /login
@@ -193,19 +193,19 @@ test.describe('Zenvlo CRM Business Onboarding Flow E2E', () => {
     ).toBeVisible();
 
     // 5. Fill out onboarding form
-    await page.getByPlaceholder('e.g. Green Orchid Salon & Spa').fill(businessName);
+    await page.getByPlaceholder('e.g. Aura Aesthetics & Laser Clinic').fill(businessName);
 
     // Select category preset
     const healthcareBtn = page.getByRole('button', { name: 'Healthcare & Clinic' });
     await healthcareBtn.click();
 
     await page.getByPlaceholder('+91 98765 43210').fill('+91 98765 43210');
-    await page.getByPlaceholder('https://example.com').fill('https://apexdental.example.com');
-    await page.getByPlaceholder('e.g. Indiranagar, Bengaluru').fill('Indiranagar, Bengaluru');
+    await page.getByPlaceholder('https://auraclinic.in').fill('https://apexdental.example.com');
+    await page.getByPlaceholder('Indiranagar, Bengaluru, Karnataka').fill('Indiranagar, Bengaluru');
 
     // 6. Submit onboarding
     const launchBtn = page.getByRole('button', {
-      name: /complete setup & launch dashboard/i,
+      name: /complete setup & enter dashboard/i,
     });
     await launchBtn.click();
 
@@ -213,7 +213,7 @@ test.describe('Zenvlo CRM Business Onboarding Flow E2E', () => {
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 
     // 8. Verify the newly configured business name and category are displayed
-    await expect(page.getByText(businessName)).toBeVisible();
+    await expect(page.getByText(businessName, { exact: true })).toBeVisible();
     await expect(page.getByText('Healthcare & Clinic')).toBeVisible();
   });
 
@@ -241,11 +241,11 @@ test.describe('Zenvlo CRM Business Onboarding Flow E2E', () => {
     await expect(page).toHaveURL(/\/onboarding/, { timeout: 15000 });
 
     // Clear business name and submit
-    const nameInput = page.getByPlaceholder('e.g. Green Orchid Salon & Spa');
+    const nameInput = page.getByPlaceholder('e.g. Aura Aesthetics & Laser Clinic');
     await nameInput.fill('');
 
     const launchBtn = page.getByRole('button', {
-      name: /complete setup & launch dashboard/i,
+      name: /complete setup & enter dashboard/i,
     });
     await launchBtn.click();
 
