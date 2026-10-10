@@ -1,7 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { useAuthStore } from '../src/stores/authStore';
+import { server } from './mocks/server';
+
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'bypass' });
+});
 
 // Polyfill window.matchMedia for theme-provider and responsive hooks
 Object.defineProperty(window, 'matchMedia', {
@@ -58,4 +63,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  server.resetHandlers();
+});
+
+afterAll(() => {
+  server.close();
 });
