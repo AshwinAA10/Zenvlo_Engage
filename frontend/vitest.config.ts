@@ -18,5 +18,21 @@ export default defineConfig({
     setupFiles: [path.resolve(__dirname, './test/setup.ts')],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', '.next', 'e2e', '../backend/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'json', 'html'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.{test,spec}.{ts,tsx}',
+        'src/components/ui/**',
+        'src/types/**',
+      ],
+      thresholds: {
+        statements: 35,
+        branches: 30,
+        functions: 25,
+        lines: 35,
+      },
+    },
   },
 });
