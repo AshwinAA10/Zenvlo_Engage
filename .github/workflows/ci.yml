@@ -69,7 +69,6 @@ jobs:
           JWT_SECRET: test_e2e_jwt_secret_only_zenvlo_engage_123456
           JWT_REFRESH_SECRET: test_e2e_jwt_refresh_secret_only_zenvlo_engage_123456
           WHATSAPP_PROVIDER: mock
-          RATE_LIMIT_ENABLED: false
         run: npm --prefix backend run test
 
   # ============================================================================
