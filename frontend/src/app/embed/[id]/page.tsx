@@ -161,7 +161,15 @@ export default function StandaloneEmbedPage() {
     );
   }
 
-  const { widget, business, stats, items } = data;
+  const widget = data.widget;
+  const business = data.business;
+  const items = data.items || [];
+  const stats = data.stats || {
+    average_rating: (business as any)?.rating || 5.0,
+    total_reviews: (business as any)?.review_count || items.length,
+    testimonials_count: items.length,
+    google_reviews_count: 0,
+  };
   const primaryColor = widget.primary_color || '#10b981';
 
   // Determine dark or light mode based on theme setting

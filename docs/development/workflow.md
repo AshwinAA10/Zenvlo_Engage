@@ -54,14 +54,73 @@ npm run dev
 ---
 
 ## Testing & Quality Gates
+
+All tests return standard process exit codes (`0` for success, non-zero for failures) to guarantee automated failure detection both locally and in CI.
+
+### 1. Frontend Unit & Integration Tests (Vitest)
 ```bash
-# Backend unit & integration tests
+# Run all frontend unit and integration tests (single run)
+npm --prefix frontend run test
+
+# Run tests in interactive watch mode
+npm --prefix frontend run test:watch
+
+# Run a single test file
+npx --prefix frontend vitest run src/components/auth/login-form.test.tsx
+
+# Run tests matching a specific pattern or describe block
+npx --prefix frontend vitest run -t "LoginForm"
+```
+
+### 2. Frontend Test Coverage
+Measures V8 code coverage against established regression thresholds (35% statements, 30% branches, 25% functions, 35% lines):
+```bash
+# Run coverage and output text summary + HTML report (frontend/coverage/index.html)
+npm --prefix frontend run test:coverage
+```
+
+### 3. Playwright End-to-End Tests
+Playwright spins up the backend test server (`PORT=4001`) and Next.js frontend (`PORT=3000`) automatically against the isolated `zenvlo_engage_test` PostgreSQL database.
+
+```bash
+# Run all end-to-end tests headless
+npm --prefix frontend run test:e2e
+
+# Run a single E2E spec file
+npx --prefix frontend playwright test e2e/testimonial-workflow.spec.ts
+
+# Debug E2E tests interactively in Playwright UI mode
+npm --prefix frontend run test:e2e:ui
+
+# Debug E2E tests step-by-step with Playwright Inspector
+npx --prefix frontend playwright test e2e/testimonial-workflow.spec.ts --debug
+
+# View failure HTML report and inspect traces/screenshots
+npx --prefix frontend playwright show-report frontend/playwright-report
+```
+
+### 4. Backend Regression Suite (Jest)
+Runs the complete NestJS backend unit and service integration test suite:
+```bash
+npm --prefix backend run test
+```
+
+### 5. Complete Local Quality Gate
+To verify all quality gates prior to opening a pull request or pushing to remote:
+```bash
+# 1. Backend regression suite
 npm --prefix backend run test
 
-# Backend build validation
-npm --prefix backend run build
+# 2. Frontend lint & static check
+npm --prefix frontend run lint
 
-# Frontend tests & build
-npm --prefix frontend run test
+# 3. Frontend coverage & unit tests (enforces coverage thresholds)
+npm --prefix frontend run test:coverage
+
+# 4. Frontend production build validation
 npm --prefix frontend run build
+
+# 5. Full browser E2E test suite
+npm --prefix frontend run test:e2e
 ```
+

@@ -181,6 +181,24 @@ npm run build
 ```bash
 cd frontend
 
+# Run Unit & Component Tests (Vitest)
+npm test
+
+# Run Vitest in Watch Mode
+npm run test:watch
+
+# Run Vitest Coverage Report
+npm run test:coverage
+
+# Run End-to-End Real Browser Tests (Playwright)
+npm run test:e2e
+
+# Run Playwright in Interactive UI Mode
+npm run test:e2e:ui
+
+# Run Full Frontend Test Suite
+npm run test:all
+
 # Run Linter
 npm run lint
 

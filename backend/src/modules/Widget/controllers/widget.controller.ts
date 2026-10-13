@@ -76,7 +76,8 @@ export class WidgetController {
     @Body() dto: CreateWidgetDto,
   ): Promise<Widget> {
     const businessId = req.user.business_id;
-    return this.widgetService.CreateWidget(businessId, dto);
+    const userId = req.user.id;
+    return this.widgetService.CreateWidget(businessId, dto, userId);
   }
 
   @Get()
