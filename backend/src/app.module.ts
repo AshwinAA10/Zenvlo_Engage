@@ -22,6 +22,7 @@ import { ReviewModule } from './modules/Review/Review.module';
 import { WidgetModule } from './modules/Widget/Widget.module';
 import { BillingModule } from './modules/Billing/Billing.module';
 import { RateLimitModule } from './modules/RateLimit/RateLimit.module';
+import { QueueModule } from './modules/Queue/Queue.module';
 
 import { validateEnvironment } from './config/env.validation';
 
@@ -105,6 +106,7 @@ import { validateEnvironment } from './config/env.validation';
     WidgetModule,
     BillingModule,
     RateLimitModule,
+    QueueModule,
   ],
 })
 export class AppModule implements NestModule {
