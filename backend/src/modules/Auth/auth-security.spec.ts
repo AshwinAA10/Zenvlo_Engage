@@ -31,7 +31,7 @@ describe('Auth Security Hardening (Phase 9E)', () => {
   const mockUser = {
     id: 'usr-sec-101',
     email: 'admin@zenvlo-secure.com',
-    password_hash: '',
+    password_hash: '$2b$12$ziAUh.OU.4So1RCspCp5lOsT5rNEySJNeV6nh/h3DRHX7Ze8AT3kK',
     token_version: 1,
     refresh_token_hash: null as string | null,
     password_reset_token_hash: null as string | null,
@@ -43,9 +43,11 @@ describe('Auth Security Hardening (Phase 9E)', () => {
   };
 
   beforeAll(async () => {
-    // Generate valid bcrypt hash for mockUser with 12 rounds
-    mockUser.password_hash = await bcrypt.hash('CorrectPassword123!', 12);
-  });
+    // Ensure valid bcrypt hash for mockUser with 12 rounds
+    if (!mockUser.password_hash) {
+      mockUser.password_hash = await bcrypt.hash('CorrectPassword123!', 12);
+    }
+  }, 30000);
 
   beforeEach(() => {
     jest.clearAllMocks();
