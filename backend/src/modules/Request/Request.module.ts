@@ -9,6 +9,7 @@ import { IntegrationModule } from '../Integration/Integration.module';
 import { BillingModule } from '../Billing/Billing.module';
 import { WebhookModule } from '../Webhook/Webhook.module';
 import { ConfigModule } from '@nestjs/config';
+import { QueueModule } from '../Queue/Queue.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ConfigModule } from '@nestjs/config';
     BillingModule,
     WebhookModule,
     ConfigModule,
+    QueueModule,
   ],
   controllers: [RequestController],
   providers: [RequestService],

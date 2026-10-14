@@ -61,6 +61,21 @@ export interface CampaignJobPayload extends TenantJobPayload {
 }
 
 /**
+ * Outbound WhatsApp testimonial request job payload.
+ */
+export interface OutboundWhatsAppJobPayload extends TenantJobPayload {
+  request_log_id: string;
+  business_id: string;
+  customer_id?: string | null;
+  customer_phone: string;
+  customer_name: string;
+  testimonial_url: string;
+  custom_message?: string | null;
+  idempotency_key: string;
+  campaign_id?: string | null;
+}
+
+/**
  * Standard Queue Job Execution Result.
  */
 export interface JobExecutionResult<T = any> {

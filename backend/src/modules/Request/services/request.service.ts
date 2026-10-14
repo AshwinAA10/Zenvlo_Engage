@@ -5,6 +5,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
@@ -24,6 +25,7 @@ import {
 } from '../../Integration/interfaces/whatsapp-integration.interface';
 import { UsageService } from '../../Billing/services/usage.service';
 import { WebhookSecurityService } from '../../Webhook/services/webhook-security.service';
+import { QueueService } from '../../Queue/services/queue.service';
 
 const STATUS_RANK: Record<string, number> = {
   QUEUED: 1,
@@ -41,6 +43,8 @@ export class RequestService {
     @Inject(WHATSAPP_INTEGRATION_SERVICE)
     private readonly whatsappService: IWhatsAppIntegrationService,
     @Optional()
+    private readonly queueService?: QueueService,
+    @Optional()
     private readonly usageService?: UsageService,
     @Optional()
     webhookSecurityService?: WebhookSecurityService,
@@ -51,6 +55,18 @@ export class RequestService {
     this.webhookSecurity =
       webhookSecurityService ||
       new WebhookSecurityService(this.logger, this.configService);
+  }
+
+  /**
+   * Evaluates if a customer has opted out or revoked messaging consent.
+   */
+  private isCustomerOptedOut(customer: Customer): boolean {
+    return (
+      customer.tags?.includes('opted_out') ||
+      customer.tags?.includes('unsubscribed') ||
+      customer.metadata?.opted_out === true ||
+      customer.metadata?.consent === false
+    );
   }
 
   async SendSingleRequest(
@@ -80,6 +96,13 @@ export class RequestService {
           'Customer not found or does not belong to your business',
         );
       }
+
+      if (this.isCustomerOptedOut(customer)) {
+        throw new BadRequestException(
+          'Customer has opted out of WhatsApp messages',
+        );
+      }
+
       customerName = customer.name;
       customerPhone = customer.phone;
     }
@@ -96,20 +119,7 @@ export class RequestService {
       'http://localhost:3000';
     const testimonialUrl = `${appBaseUrl}/submit/${business.slug}`;
 
-    const integrationResult = await this.whatsappService.SendTestimonialRequest({
-      businessId,
-      businessName: business.name,
-      customerName,
-      customerPhone,
-      testimonialUrl,
-      customMessage: dto.custom_message,
-    });
-
-    const isSuccess = integrationResult.success;
-    const deliveryStatus = isSuccess
-      ? (integrationResult.status as RequestStatus)
-      : 'FAILED';
-
+    // 1. Persist message record initially in QUEUED status
     const log = new RequestLog();
     log.business_id = businessId;
     log.customer_id = customer ? customer.id : null;
@@ -119,46 +129,93 @@ export class RequestService {
     log.template_name = 'testimonial_request';
     log.testimonial_url = testimonialUrl;
     log.custom_message = dto.custom_message || null;
-    log.delivery_status = deliveryStatus;
-    log.message_id =
-      isSuccess && integrationResult.messageId
-        ? integrationResult.messageId
-        : null;
-    log.error_message = isSuccess
-      ? null
-      : integrationResult.errorMessage ||
-        'Provider failed to send WhatsApp message';
+    log.delivery_status = 'QUEUED';
     log.sent_at = new Date();
-
-    if (
-      isSuccess &&
-      (integrationResult.status === 'DELIVERED' ||
-        integrationResult.status === 'SENT')
-    ) {
-      log.delivered_at = new Date();
-    }
+    log.error_message = null;
 
     const savedLog = await log.save();
 
-    if (customer && isSuccess) {
-      customer.last_request_sent_at = new Date();
-      customer.request_count = (customer.request_count || 0) + 1;
-      await customer.save();
-    }
+    // 2. Reliable Queue Enqueueing Strategy
+    if (this.queueService) {
+      try {
+        await this.queueService.EnqueueWhatsAppOutbound({
+          workspace_id: businessId,
+          business_id: businessId,
+          request_log_id: savedLog.id,
+          customer_id: savedLog.customer_id,
+          customer_name: savedLog.customer_name,
+          customer_phone: savedLog.customer_phone,
+          testimonial_url: savedLog.testimonial_url,
+          custom_message: savedLog.custom_message,
+          idempotency_key: `outbound_wa:${savedLog.id}`,
+        });
 
-    this.logger.info({
-      msg: isSuccess
-        ? 'WhatsApp testimonial request logged'
-        : 'WhatsApp testimonial request failed',
-      businessId,
-      customerId: log.customer_id,
-      deliveryStatus: log.delivery_status,
-      messageId: log.message_id,
-      errorMessage: log.error_message,
-    });
+        this.logger.info({
+          msg: 'WhatsApp testimonial request successfully enqueued',
+          requestLogId: savedLog.id,
+          businessId,
+          deliveryStatus: savedLog.delivery_status,
+        });
+      } catch (queueErr: any) {
+        this.logger.error({
+          msg: 'Queue enqueue failed after database persistence',
+          requestLogId: savedLog.id,
+          businessId,
+          error: queueErr.message,
+        });
+        savedLog.delivery_status = 'FAILED';
+        savedLog.error_message = `Queue enqueue failed: ${queueErr.message}`;
+        await savedLog.save();
 
-    if (this.usageService && isSuccess) {
-      await this.usageService.IncrementWhatsAppUsage(businessId);
+        throw new InternalServerErrorException(
+          `Failed to enqueue WhatsApp message: ${queueErr.message}`,
+        );
+      }
+    } else {
+      // Synchronous fallback only if QueueService is absent (e.g. isolated test environments)
+      const integrationResult = await this.whatsappService.SendTestimonialRequest({
+        businessId,
+        businessName: business.name,
+        customerName,
+        customerPhone,
+        testimonialUrl,
+        customMessage: dto.custom_message,
+      });
+
+      const isSuccess = integrationResult.success;
+      const deliveryStatus = isSuccess
+        ? ((integrationResult.status as RequestStatus) || 'SENT')
+        : 'FAILED';
+
+      savedLog.delivery_status = deliveryStatus;
+      savedLog.message_id =
+        isSuccess && integrationResult.messageId
+          ? integrationResult.messageId
+          : null;
+      savedLog.error_message = isSuccess
+        ? null
+        : integrationResult.errorMessage ||
+          'Provider failed to send WhatsApp message';
+      savedLog.sent_at = new Date();
+
+      if (
+        isSuccess &&
+        (integrationResult.status === 'DELIVERED' ||
+          integrationResult.status === 'SENT')
+      ) {
+        savedLog.delivered_at = new Date();
+      }
+      await savedLog.save();
+
+      if (customer && isSuccess) {
+        customer.last_request_sent_at = new Date();
+        customer.request_count = (customer.request_count || 0) + 1;
+        await customer.save();
+      }
+
+      if (this.usageService && isSuccess) {
+        await this.usageService.IncrementWhatsAppUsage(businessId);
+      }
     }
 
     return savedLog;

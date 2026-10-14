@@ -1,4 +1,4 @@
-import { Injectable, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, JobsOptions } from 'bullmq';
 import {
@@ -6,10 +6,12 @@ import {
   QUEUE_WEBHOOKS,
   QUEUE_MESSAGES,
   QUEUE_CAMPAIGNS,
+  QUEUE_WHATSAPP_OUTBOUND,
   JOB_SYSTEM_PING,
   JOB_SYSTEM_CLEANUP,
   JOB_META_WEBHOOK,
   JOB_SEND_MESSAGE,
+  JOB_SEND_WHATSAPP_REQUEST,
   JOB_PROCESS_CAMPAIGN,
 } from '../../../common/constants';
 import {
@@ -19,6 +21,7 @@ import {
   WebhookJobPayload,
   MessageJobPayload,
   CampaignJobPayload,
+  OutboundWhatsAppJobPayload,
 } from '../interfaces/job.interface';
 import { getDefaultJobOptions } from '../config/queue.config';
 
@@ -31,6 +34,7 @@ export class QueueService implements OnApplicationShutdown {
     @InjectQueue(QUEUE_WEBHOOKS) private readonly webhookQueue: Queue,
     @InjectQueue(QUEUE_MESSAGES) private readonly messageQueue: Queue,
     @InjectQueue(QUEUE_CAMPAIGNS) private readonly campaignQueue: Queue,
+    @Optional() @InjectQueue(QUEUE_WHATSAPP_OUTBOUND) private readonly whatsappOutboundQueue?: Queue,
   ) {
     this.queueMap = new Map<string, Queue>([
       [QUEUE_SYSTEM, this.systemQueue],
@@ -38,6 +42,9 @@ export class QueueService implements OnApplicationShutdown {
       [QUEUE_MESSAGES, this.messageQueue],
       [QUEUE_CAMPAIGNS, this.campaignQueue],
     ]);
+    if (this.whatsappOutboundQueue) {
+      this.queueMap.set(QUEUE_WHATSAPP_OUTBOUND, this.whatsappOutboundQueue);
+    }
   }
 
   /**
@@ -125,6 +132,32 @@ export class QueueService implements OnApplicationShutdown {
     const job = await this.campaignQueue.add(JOB_PROCESS_CAMPAIGN, payload, {
       ...getDefaultJobOptions(),
       attempts: 5,
+      ...options,
+    });
+    return job.id ? String(job.id) : '';
+  }
+
+  /**
+   * Enqueue outbound WhatsApp testimonial request job.
+   */
+  async EnqueueWhatsAppOutbound(
+    data: Omit<OutboundWhatsAppJobPayload, 'timestamp'>,
+    options?: JobsOptions,
+  ): Promise<string> {
+    if (!this.whatsappOutboundQueue) {
+      throw new Error(`Queue '${QUEUE_WHATSAPP_OUTBOUND}' is not registered in QueueService`);
+    }
+    const payload: OutboundWhatsAppJobPayload = {
+      ...data,
+      timestamp: Date.now(),
+    };
+    const job = await this.whatsappOutboundQueue.add(JOB_SEND_WHATSAPP_REQUEST, payload, {
+      ...getDefaultJobOptions(),
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
       ...options,
     });
     return job.id ? String(job.id) : '';
