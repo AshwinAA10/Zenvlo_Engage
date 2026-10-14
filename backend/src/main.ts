@@ -20,6 +20,8 @@ async function bootstrap() {
   const logger = app.get(Logger);
   app.useLogger(logger);
 
+  app.enableShutdownHooks();
+
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 4000;
   const corsOrigin =

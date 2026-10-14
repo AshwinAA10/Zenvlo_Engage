@@ -120,6 +120,7 @@ describe('Security Regression Audit — WhatsApp Production Enforcement (Phase 9
       JWT_SECRET: 'super_secret_jwt_key_at_least_64_characters_long_for_security_production',
       JWT_REFRESH_SECRET: 'super_secret_jwt_refresh_key_at_least_64_characters_long_production',
       POSTGRES_PASSWORD: 'secure_production_postgres_password',
+      REDIS_HOST: 'redis.production.internal',
     };
 
     it('passes validation when production configuration is fully secure', () => {
@@ -168,6 +169,32 @@ describe('Security Regression Audit — WhatsApp Production Enforcement (Phase 9
           JWT_SECRET: 'super_secret_jwt_key_zenvlo_engage_production_change_me',
         }),
       ).toThrow(/JWT_SECRET must be securely set in production/);
+    });
+
+    it('rejects production configuration if REDIS_HOST is missing', () => {
+      const config = { ...validProdConfig };
+      delete (config as any).REDIS_HOST;
+      expect(() => validateEnvironment(config)).toThrow(
+        /REDIS_HOST is required in production/,
+      );
+    });
+
+    it('rejects production configuration if REDIS_PASSWORD uses placeholder or default', () => {
+      expect(() =>
+        validateEnvironment({
+          ...validProdConfig,
+          REDIS_PASSWORD: 'zenvlo_redis_secret',
+        }),
+      ).toThrow(/REDIS_PASSWORD cannot use default or placeholder credentials in production/);
+    });
+
+    it('rejects production configuration if REDIS_PORT is invalid', () => {
+      expect(() =>
+        validateEnvironment({
+          ...validProdConfig,
+          REDIS_PORT: 'invalid_port',
+        }),
+      ).toThrow(/REDIS_PORT must be a valid port number/);
     });
   });
 

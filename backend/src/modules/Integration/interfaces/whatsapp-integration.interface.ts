@@ -14,6 +14,9 @@ export interface ISendTestimonialRequestResult {
   errorMessage?: string;
   provider?: string;
   statusCode?: number;
+  retryAfterSeconds?: number;
+  isTimeout?: boolean;
+  isAmbiguous?: boolean;
 }
 
 export interface IWhatsAppIntegrationService {

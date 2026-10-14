@@ -1,7 +1,10 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
+  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ReviewSource } from '../entities/review-source.entity';
@@ -15,6 +18,7 @@ import {
   IGooglePlacesService,
   IGooglePlaceSearchResult,
 } from '../../Integration/interfaces/google-places.interface';
+import { QueueService } from '../../Queue/services/queue.service';
 
 @Injectable()
 export class ReviewService {
@@ -22,6 +26,8 @@ export class ReviewService {
     private readonly logger: PinoLogger,
     @Inject(GOOGLE_PLACES_SERVICE)
     private readonly googlePlacesService: IGooglePlacesService,
+    @Optional()
+    private readonly queueService?: QueueService,
   ) {
     this.logger.setContext(ReviewService.name);
   }
@@ -94,6 +100,90 @@ export class ReviewService {
     return { source, reviewsImported: importedCount };
   }
 
+  async EnqueueSync(
+    businessId: string,
+    sourceId: string,
+  ): Promise<{ status: string; jobId?: string; message: string; source?: ReviewSource }> {
+    const source = await ReviewSource.findOne({
+      where: { id: sourceId, business_id: businessId },
+    });
+
+    if (!source) {
+      throw new NotFoundException('Review source not found');
+    }
+
+    if (!source.is_active || source.sync_status === 'REVOKED') {
+      throw new BadRequestException(
+        'Review source is inactive or integration credentials have been revoked',
+      );
+    }
+
+    if (source.sync_status === 'SYNCING') {
+      throw new ConflictException(
+        'A synchronization job is already running for this source',
+      );
+    }
+
+    if (this.queueService) {
+      const jobId = await this.queueService.EnqueueGoogleSync({
+        workspace_id: businessId,
+        business_id: businessId,
+        source_id: source.id,
+        external_id: source.external_id,
+        checkpoint: source.metadata?.checkpoint,
+      });
+
+      source.sync_status = 'SYNCING';
+      source.sync_job_id = jobId;
+      await source.save();
+
+      return {
+        status: 'QUEUED',
+        jobId,
+        message: 'Google synchronization job enqueued successfully',
+      };
+    }
+
+    // Synchronous execution fallback when queue is not configured
+    const syncRes = await this.SyncReviews(businessId, sourceId);
+    return {
+      status: 'COMPLETED',
+      message: 'Google reviews synchronized synchronously',
+      source: syncRes.source,
+    };
+  }
+
+  async GetSyncStatus(
+    businessId: string,
+    sourceId: string,
+  ): Promise<{
+    source_id: string;
+    sync_status: string;
+    last_synced_at: Date | null;
+    last_sync_error: string | null;
+    sync_job_id: string | null;
+    checkpoint: any;
+    is_active: boolean;
+  }> {
+    const source = await ReviewSource.findOne({
+      where: { id: sourceId, business_id: businessId },
+    });
+
+    if (!source) {
+      throw new NotFoundException('Review source not found');
+    }
+
+    return {
+      source_id: source.id,
+      sync_status: source.sync_status,
+      last_synced_at: source.last_synced_at,
+      last_sync_error: source.last_sync_error,
+      sync_job_id: source.sync_job_id,
+      checkpoint: source.metadata?.checkpoint || null,
+      is_active: source.is_active,
+    };
+  }
+
   async SyncReviews(
     businessId: string,
     sourceId: string,
@@ -106,6 +196,12 @@ export class ReviewService {
       throw new NotFoundException('Review source not found');
     }
 
+    if (!source.is_active || source.sync_status === 'REVOKED') {
+      throw new BadRequestException(
+        'Review source is inactive or integration credentials have been revoked',
+      );
+    }
+
     const details = await this.googlePlacesService.GetPlaceDetails(
       source.external_id,
     );
@@ -114,11 +210,15 @@ export class ReviewService {
     source.address = details.formattedAddress;
     source.rating = details.rating;
     source.review_count = details.userRatingsTotal;
-    source.last_synced_at = new Date();
-    await source.save();
 
     let newlyImported = 0;
+    let latestReviewDate: Date | null = null;
     for (const rev of details.reviews) {
+      const revDate = rev.reviewDate ? new Date(rev.reviewDate) : new Date();
+      if (!latestReviewDate || revDate > latestReviewDate) {
+        latestReviewDate = revDate;
+      }
+
       const existing = await Review.findOne({
         where: { business_id: businessId, external_id: rev.externalId },
       });
@@ -132,13 +232,36 @@ export class ReviewService {
         review.author_photo_url = rev.authorPhotoUrl || null;
         review.rating = rev.rating;
         review.content = rev.text;
-        review.review_date = rev.reviewDate;
+        review.review_date = revDate;
         review.original_url = rev.profileUrl || null;
         review.is_visible = true;
         await review.save();
         newlyImported++;
+      } else {
+        existing.author_name = rev.authorName || existing.author_name;
+        existing.author_photo_url =
+          rev.authorPhotoUrl !== undefined ? rev.authorPhotoUrl : existing.author_photo_url;
+        existing.rating = rev.rating !== undefined ? rev.rating : existing.rating;
+        existing.content = rev.text !== undefined ? rev.text : existing.content;
+        existing.review_date = revDate;
+        existing.original_url =
+          rev.profileUrl !== undefined ? rev.profileUrl : existing.original_url;
+        await existing.save();
       }
     }
+
+    source.last_synced_at = new Date();
+    source.sync_status = 'SUCCESS';
+    source.last_sync_error = null;
+    source.metadata = {
+      ...(source.metadata || {}),
+      checkpoint: {
+        last_synced_review_date: latestReviewDate ? latestReviewDate.toISOString() : null,
+        synced_count: details.reviews?.length || 0,
+        last_completed_at: new Date().toISOString(),
+      },
+    };
+    await source.save();
 
     this.logger.info({
       msg: 'Synced Google Place reviews',

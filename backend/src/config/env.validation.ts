@@ -8,6 +8,15 @@ export interface EnvironmentVariables {
   POSTGRES_DB?: string;
   REDIS_HOST?: string;
   REDIS_PORT?: number;
+  REDIS_PASSWORD?: string;
+  REDIS_DB?: number;
+  REDIS_TLS?: string;
+  ENABLE_WORKERS?: string;
+  WORKER_CONCURRENCY?: number;
+  WORKER_LOCK_DURATION_MS?: number;
+  WORKER_STALLED_INTERVAL_MS?: number;
+  QUEUE_DEFAULT_ATTEMPTS?: number;
+  QUEUE_DEFAULT_BACKOFF_DELAY?: number;
   JWT_SECRET?: string;
   JWT_REFRESH_SECRET?: string;
   WHATSAPP_PROVIDER?: string;
@@ -116,6 +125,20 @@ export function validateEnvironment(config: Record<string, any>): Record<string,
     const zenvloWebhookSecret = config.ZENVLO_WHATSAPP_WEBHOOK_SECRET || process.env.ZENVLO_WHATSAPP_WEBHOOK_SECRET;
     if (zenvloWebhookSecret && (zenvloWebhookSecret.startsWith('placeholder_') || zenvloWebhookSecret.includes('your_internal_'))) {
       errors.push('[SECURITY FATAL] ZENVLO_WHATSAPP_WEBHOOK_SECRET cannot use placeholder credentials in production.');
+    }
+
+    // 7. Redis Configuration Validation
+    const redisHost = config.REDIS_HOST || process.env.REDIS_HOST;
+    if (!redisHost && isProduction) {
+      errors.push('[SECURITY FATAL] REDIS_HOST is required in production.');
+    }
+    const redisPort = config.REDIS_PORT || process.env.REDIS_PORT;
+    if (redisPort && (isNaN(Number(redisPort)) || Number(redisPort) <= 0 || Number(redisPort) > 65535)) {
+      errors.push('[SECURITY FATAL] REDIS_PORT must be a valid port number (1-65535).');
+    }
+    const redisPassword = config.REDIS_PASSWORD || process.env.REDIS_PASSWORD;
+    if (redisPassword && (redisPassword === 'zenvlo_redis_secret' || redisPassword.startsWith('placeholder_'))) {
+      errors.push('[SECURITY FATAL] REDIS_PASSWORD cannot use default or placeholder credentials in production.');
     }
 
     if (errors.length > 0) {

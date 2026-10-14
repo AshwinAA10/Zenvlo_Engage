@@ -3,10 +3,13 @@ import { TenantBaseEntity } from '../../../database/tenant-base.entity';
 
 export type RequestStatus =
   | 'QUEUED'
+  | 'PROCESSING'
+  | 'SUBMITTED'
   | 'SENT'
   | 'DELIVERED'
   | 'READ'
   | 'FAILED'
+  | 'AMBIGUOUS'
   | 'PENDING_CONTRACT';
 
 export type RequestChannel = 'WHATSAPP';
