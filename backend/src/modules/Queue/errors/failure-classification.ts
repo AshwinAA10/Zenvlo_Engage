@@ -113,13 +113,14 @@ export function classifyFailure(
     };
   }
 
-  // 2. Authentication & Credential Failures (401, 403)
+  // 2. Authentication & Credential Failures (401, 403, Google REQUEST_DENIED)
   if (
     statusCode === 401 ||
     statusCode === 403 ||
     lowerMsg.includes('unauthorized') ||
     lowerMsg.includes('authentication failed') ||
     lowerMsg.includes('invalid api key') ||
+    lowerMsg.includes('request_denied') ||
     lowerMsg.includes('revoked')
   ) {
     return {
@@ -142,6 +143,7 @@ export function classifyFailure(
     lowerMsg.includes('quota exhausted') ||
     lowerMsg.includes('invalid recipient') ||
     lowerMsg.includes('invalid phone') ||
+    lowerMsg.includes('invalid_request') ||
     lowerMsg.includes('malformed')
   ) {
     return {
@@ -154,8 +156,13 @@ export function classifyFailure(
     };
   }
 
-  // 4. Rate Limiting (429)
-  if (statusCode === 429 || lowerMsg.includes('rate limit') || lowerMsg.includes('too many requests')) {
+  // 4. Rate Limiting (429, Google OVER_QUERY_LIMIT)
+  if (
+    statusCode === 429 ||
+    lowerMsg.includes('rate limit') ||
+    lowerMsg.includes('too many requests') ||
+    lowerMsg.includes('over_query_limit')
+  ) {
     const retryAfter = context?.retryAfterSeconds;
     return {
       category: ErrorCategory.RATE_LIMIT,

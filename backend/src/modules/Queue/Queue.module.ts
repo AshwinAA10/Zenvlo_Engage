@@ -8,6 +8,7 @@ import {
   QUEUE_CAMPAIGNS,
   QUEUE_WHATSAPP_OUTBOUND,
   QUEUE_BATCH_OPERATIONS,
+  QUEUE_GOOGLE_SYNC,
 } from '../../common/constants';
 import { QueueService } from './services/queue.service';
 import { QueueHealthService } from './services/queue-health.service';
@@ -19,6 +20,7 @@ import { BatchController } from './controllers/batch.controller';
 import { WebhookProcessor } from './processors/webhook.processor';
 import { SystemProcessor } from './processors/system.processor';
 import { WhatsAppOutboundProcessor } from './processors/whatsapp-outbound.processor';
+import { GoogleSyncProcessor } from './processors/google-sync.processor';
 import { getRedisConnectionConfig, getDefaultJobOptions } from './config/queue.config';
 import { IntegrationModule } from '../Integration/Integration.module';
 import { BillingModule } from '../Billing/Billing.module';
@@ -28,7 +30,7 @@ const isWorkersEnabled = (): boolean => {
 };
 
 const defaultWorkerProviders = isWorkersEnabled()
-  ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor, BatchProcessor]
+  ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor, BatchProcessor, GoogleSyncProcessor]
   : [];
 
 @Module({
@@ -48,6 +50,7 @@ const defaultWorkerProviders = isWorkersEnabled()
       { name: QUEUE_CAMPAIGNS },
       { name: QUEUE_WHATSAPP_OUTBOUND },
       { name: QUEUE_BATCH_OPERATIONS },
+      { name: QUEUE_GOOGLE_SYNC },
     ),
     IntegrationModule,
     BillingModule,
@@ -70,7 +73,7 @@ export class QueueModule {
   static register(options?: { enableWorkers?: boolean }): DynamicModule {
     const enable = options?.enableWorkers ?? isWorkersEnabled();
     const workers = enable
-      ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor, BatchProcessor]
+      ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor, BatchProcessor, GoogleSyncProcessor]
       : [];
 
     return {
@@ -83,6 +86,7 @@ export class QueueModule {
           { name: QUEUE_CAMPAIGNS },
           { name: QUEUE_WHATSAPP_OUTBOUND },
           { name: QUEUE_BATCH_OPERATIONS },
+          { name: QUEUE_GOOGLE_SYNC },
         ),
         IntegrationModule,
         BillingModule,

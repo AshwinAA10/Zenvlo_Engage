@@ -106,6 +106,24 @@ export class GooglePlacesService implements IGooglePlacesService {
         );
         const data = (await res.json()) as any;
 
+        if (data && data.status && data.status !== 'OK') {
+          if (data.status === 'REQUEST_DENIED') {
+            throw new Error(
+              `Google Places API REQUEST_DENIED: ${data.error_message || 'The provided API key is invalid or revoked'}`,
+            );
+          }
+          if (data.status === 'OVER_QUERY_LIMIT') {
+            throw new Error(
+              `Google Places API OVER_QUERY_LIMIT: Quota exceeded or rate limited`,
+            );
+          }
+          if (data.status === 'INVALID_REQUEST' || data.status === 'NOT_FOUND') {
+            throw new Error(
+              `Google Places API ${data.status}: ${data.error_message || 'Invalid request or place not found'}`,
+            );
+          }
+        }
+
         if (data && data.result) {
           const r = data.result;
           const reviews: IGoogleReview[] = (r.reviews || []).map(
@@ -134,9 +152,16 @@ export class GooglePlacesService implements IGooglePlacesService {
         }
       } catch (err: any) {
         this.logger.error({
-          msg: 'Google Place Details API failed, falling back to simulated reviews',
+          msg: 'Google Place Details API failed',
           error: err.message,
         });
+        if (
+          err.message?.includes('REQUEST_DENIED') ||
+          err.message?.includes('OVER_QUERY_LIMIT') ||
+          err.message?.includes('INVALID_REQUEST')
+        ) {
+          throw err;
+        }
       }
     }
 

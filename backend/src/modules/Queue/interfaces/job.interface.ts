@@ -91,6 +91,21 @@ export interface BatchChunkJobPayload extends TenantJobPayload {
 }
 
 /**
+ * Asynchronous Google Sync job payload (Google Places & Reviews).
+ */
+export interface GoogleSyncJobPayload extends TenantJobPayload {
+  source_id: string;
+  business_id: string;
+  external_id: string;
+  checkpoint?: {
+    last_synced_review_date?: string;
+    synced_count?: number;
+  };
+  idempotency_key?: string;
+  forced?: boolean;
+}
+
+/**
  * Standard Queue Job Execution Result.
  */
 export interface JobExecutionResult<T = any> {

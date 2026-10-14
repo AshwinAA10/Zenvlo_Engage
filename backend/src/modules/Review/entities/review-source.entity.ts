@@ -5,6 +5,7 @@ import { Review } from './review.entity';
 @Entity('review_sources')
 @Index(['business_id', 'platform'])
 @Index(['business_id', 'external_id'])
+@Index(['business_id', 'sync_status'])
 export class ReviewSource extends TenantBaseEntity {
   @Column({ type: 'varchar', length: 50, default: 'GOOGLE' })
   platform: string;
@@ -27,8 +28,17 @@ export class ReviewSource extends TenantBaseEntity {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
+  @Column({ type: 'varchar', length: 50, default: 'IDLE' })
+  sync_status: 'IDLE' | 'SYNCING' | 'SUCCESS' | 'FAILED' | 'REVOKED' | string;
+
   @Column({ type: 'timestamptz', nullable: true })
   last_synced_at: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  last_sync_error: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  sync_job_id: string | null;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;

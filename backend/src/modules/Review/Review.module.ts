@@ -5,11 +5,13 @@ import { Review } from './entities/review.entity';
 import { ReviewService } from './services/review.service';
 import { ReviewController } from './controllers/review.controller';
 import { IntegrationModule } from '../Integration/Integration.module';
+import { QueueModule } from '../Queue/Queue.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ReviewSource, Review]),
     IntegrationModule,
+    QueueModule,
   ],
   controllers: [ReviewController],
   providers: [ReviewService],

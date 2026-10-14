@@ -8,12 +8,14 @@ import {
   QUEUE_CAMPAIGNS,
   QUEUE_WHATSAPP_OUTBOUND,
   QUEUE_BATCH_OPERATIONS,
+  QUEUE_GOOGLE_SYNC,
   JOB_SYSTEM_PING,
   JOB_SYSTEM_CLEANUP,
   JOB_META_WEBHOOK,
   JOB_SEND_MESSAGE,
   JOB_SEND_WHATSAPP_REQUEST,
   JOB_PROCESS_CAMPAIGN,
+  JOB_GOOGLE_PLACE_SYNC,
 } from '../../../common/constants';
 import {
   BaseJobPayload,
@@ -23,6 +25,7 @@ import {
   MessageJobPayload,
   CampaignJobPayload,
   OutboundWhatsAppJobPayload,
+  GoogleSyncJobPayload,
 } from '../interfaces/job.interface';
 import { getDefaultJobOptions } from '../config/queue.config';
 
@@ -37,6 +40,7 @@ export class QueueService implements OnApplicationShutdown {
     @InjectQueue(QUEUE_CAMPAIGNS) private readonly campaignQueue: Queue,
     @Optional() @InjectQueue(QUEUE_WHATSAPP_OUTBOUND) private readonly whatsappOutboundQueue?: Queue,
     @Optional() @InjectQueue(QUEUE_BATCH_OPERATIONS) private readonly batchOperationsQueue?: Queue,
+    @Optional() @InjectQueue(QUEUE_GOOGLE_SYNC) private readonly googleSyncQueue?: Queue,
   ) {
     this.queueMap = new Map<string, Queue>([
       [QUEUE_SYSTEM, this.systemQueue],
@@ -49,6 +53,9 @@ export class QueueService implements OnApplicationShutdown {
     }
     if (this.batchOperationsQueue) {
       this.queueMap.set(QUEUE_BATCH_OPERATIONS, this.batchOperationsQueue);
+    }
+    if (this.googleSyncQueue) {
+      this.queueMap.set(QUEUE_GOOGLE_SYNC, this.googleSyncQueue);
     }
   }
 
@@ -162,6 +169,35 @@ export class QueueService implements OnApplicationShutdown {
       backoff: {
         type: 'exponential',
         delay: 2000,
+      },
+      ...options,
+    });
+    return job.id ? String(job.id) : '';
+  }
+
+  /**
+   * Enqueue asynchronous Google review synchronization job for a connected review source.
+   * Uses a deterministic jobId (default: google_sync_<source_id>) to prevent overlapping runs.
+   */
+  async EnqueueGoogleSync(
+    data: Omit<GoogleSyncJobPayload, 'timestamp'>,
+    options?: JobsOptions,
+  ): Promise<string> {
+    if (!this.googleSyncQueue) {
+      throw new Error(`Queue '${QUEUE_GOOGLE_SYNC}' is not registered in QueueService`);
+    }
+    const payload: GoogleSyncJobPayload = {
+      ...data,
+      timestamp: Date.now(),
+    };
+    const defaultJobId = `google_sync_${data.source_id}`;
+    const job = await this.googleSyncQueue.add(JOB_GOOGLE_PLACE_SYNC, payload, {
+      ...getDefaultJobOptions(),
+      jobId: options?.jobId || defaultJobId,
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 3000,
       },
       ...options,
     });

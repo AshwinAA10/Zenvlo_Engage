@@ -9,6 +9,8 @@ import {
   UseGuards,
   Req,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -57,16 +59,30 @@ export class ReviewController {
   }
 
   @Post('sources/:id/sync')
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Synchronize and refresh latest reviews from connected Google Place',
+    summary: 'Synchronize and refresh latest reviews from connected Google Place (Asynchronous Queue Job)',
   })
-  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 202, description: 'Google review synchronization job enqueued' })
   async SyncReviews(
     @Req() req: any,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const businessId = req.user.business_id;
-    return this.reviewService.SyncReviews(businessId, id);
+    return this.reviewService.EnqueueSync(businessId, id);
+  }
+
+  @Get('sources/:id/sync/status')
+  @ApiOperation({
+    summary: 'Get Google Place synchronization status, checkpoint and last sync errors',
+  })
+  @ApiResponse({ status: 200 })
+  async GetSyncStatus(
+    @Req() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const businessId = req.user.business_id;
+    return this.reviewService.GetSyncStatus(businessId, id);
   }
 
   @Get('sources')
