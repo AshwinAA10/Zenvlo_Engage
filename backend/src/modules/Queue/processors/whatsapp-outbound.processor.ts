@@ -9,23 +9,31 @@ import { OutboundWhatsAppJobPayload } from '../interfaces/job.interface';
 import {
   WHATSAPP_INTEGRATION_SERVICE,
   IWhatsAppIntegrationService,
+  ISendTestimonialRequestResult,
 } from '../../Integration/interfaces/whatsapp-integration.interface';
 import { RequestLog } from '../../Request/entities/request-log.entity';
 import { Customer } from '../../Customer/entities/customer.entity';
 import { Business } from '../../Business/entities/business.entity';
 import { UsageService } from '../../Billing/services/usage.service';
+import {
+  classifyFailure,
+  ErrorCategory,
+} from '../errors/failure-classification';
+import { calculateBackoffWithJitter } from '../config/queue.config';
 
 /**
  * BullMQ Worker Processor for asynchronous outbound WhatsApp messages.
  *
- * Security & Reliability Invariants:
+ * Reliability & Failure Handling Invariants:
  * - Strictly validates and propagates tenant workspace context via ClsService.
- * - Authoritatively queries persisted RequestLog to prevent phantom or uncoordinated sends.
+ * - Authoritatively queries persisted RequestLog to prevent phantom sends.
  * - Idempotently checks if the message was already submitted, preventing duplicate WhatsApp messages on retry.
  * - Enforces recipient consent and opt-out rules prior to provider transmission.
  * - Enforces monthly subscription usage quotas.
  * - Differentiates provider acceptance (status: SENT) from device delivery (status: DELIVERED via webhook).
  * - Distinguishes retryable errors (429, 5xx, timeout) from permanent errors (400, 422).
+ * - Implements failure classification with jittered exponential backoff and rate-limit respect.
+ * - Safeguards ambiguous outcomes (timeouts after dispatch) by marking AMBIGUOUS and halting blind retries.
  */
 @Processor(QUEUE_WHATSAPP_OUTBOUND)
 export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
@@ -51,6 +59,9 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
     job: Job<OutboundWhatsAppJobPayload, any, string>,
   ): Promise<any> {
     const { request_log_id, business_id } = job.data;
+    const businessId = business_id;
+    const maxAttempts = job.opts?.attempts || 3;
+    const currentAttempt = job.attemptsMade + 1;
 
     // 1. Retrieve authoritative record from database
     const log = await RequestLog.findOne({
@@ -68,7 +79,7 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
       return { processed: false, reason: 'RECORD_NOT_FOUND' };
     }
 
-    // 2. Prevent duplicate processing and duplicate provider submissions
+    // 2. Prevent duplicate processing and duplicate provider submissions (Idempotency)
     if (
       log.message_id ||
       ['SENT', 'DELIVERED', 'READ'].includes(log.delivery_status)
@@ -102,7 +113,8 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
 
       if (!customer) {
         log.delivery_status = 'FAILED';
-        log.error_message = 'Associated customer record was not found or deleted';
+        log.error_message =
+          '[PERMANENT_VALIDATION] Associated customer record was not found or deleted';
         await log.save();
         return { processed: false, status: 'FAILED', reason: 'CUSTOMER_NOT_FOUND' };
       }
@@ -122,7 +134,8 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
           'Outbound WhatsApp job aborted: recipient customer has opted out of messages',
         );
         log.delivery_status = 'FAILED';
-        log.error_message = 'Customer has opted out of WhatsApp messages';
+        log.error_message =
+          '[PERMANENT_VALIDATION] Customer has opted out of WhatsApp messages';
         await log.save();
         return { processed: false, status: 'FAILED', reason: 'OPTED_OUT' };
       }
@@ -141,8 +154,9 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
           'Outbound WhatsApp job aborted: subscription request limit exhausted',
         );
         log.delivery_status = 'FAILED';
-        log.error_message =
-          quotaErr.message || 'Monthly WhatsApp request limit reached for plan';
+        log.error_message = `[PERMANENT_VALIDATION] ${
+          quotaErr.message || 'Monthly WhatsApp request limit reached for plan'
+        }`;
         await log.save();
         return { processed: false, status: 'FAILED', reason: 'LIMIT_EXHAUSTED' };
       }
@@ -153,14 +167,28 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
     const businessName = business?.name || 'Your Business';
 
     // 7. Dispatch through Zenvlo Engage WhatsApp provider
-    const integrationResult = await this.whatsappService.SendTestimonialRequest({
-      businessId: business_id,
-      businessName,
-      customerName: log.customer_name,
-      customerPhone: log.customer_phone,
-      testimonialUrl: log.testimonial_url,
-      customMessage: log.custom_message || undefined,
-    });
+    let integrationResult: ISendTestimonialRequestResult;
+    try {
+      integrationResult = await this.whatsappService.SendTestimonialRequest({
+        businessId: business_id,
+        businessName,
+        customerName: log.customer_name,
+        customerPhone: log.customer_phone,
+        testimonialUrl: log.testimonial_url,
+        customMessage: log.custom_message || undefined,
+      });
+    } catch (dispatchErr: any) {
+      const isTimeout =
+        dispatchErr?.name === 'AbortError' ||
+        dispatchErr?.message?.includes('timed out');
+      integrationResult = {
+        success: false,
+        status: 'FAILED',
+        statusCode: isTimeout ? 504 : 0,
+        isTimeout,
+        errorMessage: dispatchErr?.message || 'Provider connection error',
+      };
+    }
 
     // 8. Handle provider response & state tracking
     if (integrationResult.success && integrationResult.messageId) {
@@ -198,56 +226,116 @@ export class WhatsAppOutboundProcessor extends BaseTenantWorkerHost<
         messageId: log.message_id,
       };
     } else {
-      // Provider failed or rejected
-      const statusCode = integrationResult.statusCode;
-      const isRetryable =
-        statusCode === 429 ||
-        (statusCode !== undefined && statusCode >= 500) ||
-        integrationResult.errorMessage?.includes('timed out') ||
-        integrationResult.errorMessage?.includes('connection error');
+      // Classify the failure
+      const classification = classifyFailure(integrationResult.errorMessage, {
+        statusCode: integrationResult.statusCode,
+        retryAfterSeconds: integrationResult.retryAfterSeconds,
+        isTimeout: integrationResult.isTimeout,
+        hasSentPayload: true,
+        attemptsMade: job.attemptsMade,
+        maxAttempts,
+      });
 
-      const maxAttempts = job.opts?.attempts || 3;
-      if (isRetryable && job.attemptsMade < maxAttempts - 1) {
-        log.error_message = `Attempt ${job.attemptsMade + 1} failed: ${integrationResult.errorMessage}`;
+      // 9. Ambiguous outcome handling (safeguarded: do NOT blindly retry!)
+      if (
+        classification.category === ErrorCategory.AMBIGUOUS_OUTCOME ||
+        integrationResult.isAmbiguous
+      ) {
+        log.delivery_status = 'AMBIGUOUS';
+        log.error_message = `[AMBIGUOUS_OUTCOME] Attempt ${currentAttempt}/${maxAttempts} timed out after dispatch. Reconciliation required: ${classification.reason}`;
         await log.save();
 
         this.logger.warn(
           {
             requestLogId: log.id,
-            attemptsMade: job.attemptsMade,
-            statusCode,
-            error: integrationResult.errorMessage,
+            businessId,
+            currentAttempt,
+            error: classification.reason,
           },
-          'Provider encountered temporary error; scheduling retry',
+          'WhatsApp submission outcome ambiguous; halting blind retries to prevent duplicate delivery',
         );
 
+        return {
+          processed: false,
+          status: 'AMBIGUOUS',
+          reason: 'AMBIGUOUS_OUTCOME',
+          error: log.error_message,
+        };
+      }
+
+      // 10. Non-retryable Permanent Failures (Client validation errors 400/422, credentials 401/403)
+      if (!classification.isRetryable) {
+        log.delivery_status = 'FAILED';
+        log.error_message = `[${classification.category}] ${classification.reason}`;
+        await log.save();
+
+        this.logger.error(
+          {
+            requestLogId: log.id,
+            businessId,
+            statusCode: classification.statusCode,
+            category: classification.category,
+            error: log.error_message,
+          },
+          'Outbound WhatsApp request permanently failed (terminal non-retryable)',
+        );
+
+        return {
+          processed: false,
+          status: 'FAILED',
+          category: classification.category,
+          error: log.error_message,
+        };
+      }
+
+      // 11. Retryable Failures (429 Rate Limit, 5xx Server Error, Transient Network)
+      if (job.attemptsMade < maxAttempts - 1) {
+        log.delivery_status = 'PROCESSING';
+        log.error_message = `Attempt ${currentAttempt} failed: [${classification.category}] ${classification.reason}`;
+        await log.save();
+
+        const jitteredDelayMs = classification.retryAfterSeconds
+          ? classification.retryAfterSeconds * 1000
+          : calculateBackoffWithJitter(job.attemptsMade, 2000, 60000, 0.2);
+
+        this.logger.warn(
+          {
+            requestLogId: log.id,
+            attemptsMade: job.attemptsMade,
+            nextAttempt: currentAttempt + 1,
+            category: classification.category,
+            backoffMs: jitteredDelayMs,
+            error: classification.reason,
+          },
+          'Provider encountered temporary error; scheduling retry with backoff',
+        );
+
+        // Throw error so BullMQ triggers configured exponential backoff retry
         throw new Error(
-          `WhatsApp provider temporary error (${statusCode || 'network'}): ${integrationResult.errorMessage}`,
+          `WhatsApp provider temporary error (${classification.statusCode || 'network'}): ${classification.reason}`,
         );
       }
 
-      // Terminal failure (permanent client error 400/422 or exhausted retries)
+      // 12. Exhausted all retries (Terminal state in DLQ)
       log.delivery_status = 'FAILED';
-      log.error_message =
-        integrationResult.errorMessage ||
-        'WhatsApp provider rejected or failed to process message';
+      log.error_message = `[${classification.category}] All ${maxAttempts} attempts exhausted at ${classification.timestamp}. Final error: ${classification.reason}`;
       await log.save();
 
       this.logger.error(
         {
           requestLogId: log.id,
-          businessId: business_id,
-          statusCode,
+          businessId,
+          attemptsMade: currentAttempt,
+          category: classification.category,
           error: log.error_message,
         },
-        'Outbound WhatsApp request permanently failed',
+        'Outbound WhatsApp request retries exhausted; marked as FAILED in terminal state',
       );
 
-      return {
-        processed: false,
-        status: 'FAILED',
-        error: log.error_message,
-      };
+      // Throw error on final attempt so BullMQ moves the job to the failed set (DLQ)
+      throw new Error(
+        `WhatsApp provider retries exhausted (${maxAttempts}/${maxAttempts}): ${classification.reason}`,
+      );
     }
   }
 }

@@ -9,6 +9,7 @@ export type RequestStatus =
   | 'DELIVERED'
   | 'READ'
   | 'FAILED'
+  | 'AMBIGUOUS'
   | 'PENDING_CONTRACT';
 
 export type RequestChannel = 'WHATSAPP';

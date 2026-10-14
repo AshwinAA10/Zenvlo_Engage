@@ -10,6 +10,8 @@ import {
 } from '../../common/constants';
 import { QueueService } from './services/queue.service';
 import { QueueHealthService } from './services/queue-health.service';
+import { QueueAdminService } from './services/queue-admin.service';
+import { QueueAdminController } from './controllers/queue-admin.controller';
 import { WebhookProcessor } from './processors/webhook.processor';
 import { SystemProcessor } from './processors/system.processor';
 import { WhatsAppOutboundProcessor } from './processors/whatsapp-outbound.processor';
@@ -45,12 +47,14 @@ const defaultWorkerProviders = isWorkersEnabled()
     IntegrationModule,
     BillingModule,
   ],
+  controllers: [QueueAdminController],
   providers: [
     QueueService,
     QueueHealthService,
+    QueueAdminService,
     ...defaultWorkerProviders,
   ],
-  exports: [QueueService, QueueHealthService, BullModule],
+  exports: [QueueService, QueueHealthService, QueueAdminService, BullModule],
 })
 export class QueueModule {
   /**
@@ -76,8 +80,9 @@ export class QueueModule {
         IntegrationModule,
         BillingModule,
       ],
-      providers: [QueueService, QueueHealthService, ...workers],
-      exports: [QueueService, QueueHealthService, BullModule],
+      controllers: [QueueAdminController],
+      providers: [QueueService, QueueHealthService, QueueAdminService, ...workers],
+      exports: [QueueService, QueueHealthService, QueueAdminService, BullModule],
     };
   }
 }

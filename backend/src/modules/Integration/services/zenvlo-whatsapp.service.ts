@@ -152,9 +152,14 @@ export class ZenvloWhatsAppService implements IWhatsAppIntegrationService {
       }
 
       if (response.status === 429) {
+        const retryAfterHeader = response.headers?.get?.('retry-after');
+        const parsedSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : undefined;
+        const retryAfterSeconds = parsedSeconds && !isNaN(parsedSeconds) && parsedSeconds > 0 ? parsedSeconds : undefined;
+
         this.logger.warn({
           msg: 'WhatsApp provider rate limit exceeded (429).',
           businessId: input.businessId,
+          retryAfterSeconds,
           latencyMs,
         });
 
@@ -162,7 +167,10 @@ export class ZenvloWhatsAppService implements IWhatsAppIntegrationService {
           success: false,
           status: 'FAILED',
           statusCode: 429,
-          errorMessage: 'WhatsApp provider rate limit exceeded.',
+          retryAfterSeconds,
+          errorMessage: retryAfterSeconds
+            ? `WhatsApp provider rate limit exceeded. Retry after ${retryAfterSeconds}s.`
+            : 'WhatsApp provider rate limit exceeded.',
           provider: 'zenvlo',
         };
       }
@@ -293,6 +301,8 @@ export class ZenvloWhatsAppService implements IWhatsAppIntegrationService {
         return {
           success: false,
           status: 'FAILED',
+          statusCode: 504,
+          isTimeout: true,
           errorMessage: 'WhatsApp provider request timed out.',
           provider: 'zenvlo',
         };

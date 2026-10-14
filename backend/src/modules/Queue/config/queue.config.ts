@@ -68,6 +68,30 @@ export function getRedisConnectionConfig(configService?: ConfigService): RedisCo
 }
 
 /**
+ * Calculates exponential backoff with jitter to prevent synchronized thundering herds.
+ * Formula: delay = Math.min(maxDelay, baseDelay * 2^attemptsMade) + jitter
+ *
+ * @param attemptsMade - Current attempt count (0-indexed)
+ * @param baseDelay - Base delay in milliseconds (default: 2000)
+ * @param maxDelay - Maximum delay cap in milliseconds (default: 60000)
+ * @param jitterRatio - Jitter ratio [0.0 - 1.0] (default: 0.2)
+ * @param randomFn - Optional random number generator (0.0 to 1.0) for deterministic unit testing
+ */
+export function calculateBackoffWithJitter(
+  attemptsMade: number,
+  baseDelay: number = 2000,
+  maxDelay: number = 60000,
+  jitterRatio: number = 0.2,
+  randomFn: () => number = Math.random,
+): number {
+  const boundedAttempts = Math.max(0, attemptsMade);
+  const exponential = Math.min(maxDelay, baseDelay * Math.pow(2, boundedAttempts));
+  const jitterRange = exponential * Math.max(0, Math.min(1, jitterRatio));
+  const jitter = jitterRange * randomFn();
+  return Math.floor(exponential + jitter);
+}
+
+/**
  * Shared default job options for BullMQ queues (retries, backoff, and automatic log pruning).
  */
 export function getDefaultJobOptions(configService?: ConfigService): DefaultJobOptions {
@@ -83,7 +107,7 @@ export function getDefaultJobOptions(configService?: ConfigService): DefaultJobO
     String(
       configService?.get<string>('QUEUE_DEFAULT_BACKOFF_DELAY') ||
         process.env.QUEUE_DEFAULT_BACKOFF_DELAY ||
-        '1000',
+        '2000',
     ),
     10,
   );
@@ -92,7 +116,7 @@ export function getDefaultJobOptions(configService?: ConfigService): DefaultJobO
     attempts: isNaN(attempts) ? 3 : attempts,
     backoff: {
       type: 'exponential',
-      delay: isNaN(backoffDelay) ? 1000 : backoffDelay,
+      delay: isNaN(backoffDelay) ? 2000 : backoffDelay,
     },
     removeOnComplete: {
       count: 1000, // Retain last 1000 completed jobs for auditing
