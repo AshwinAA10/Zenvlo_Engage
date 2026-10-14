@@ -76,6 +76,21 @@ export interface OutboundWhatsAppJobPayload extends TenantJobPayload {
 }
 
 /**
+ * Generic Batch Chunk processing payload.
+ */
+export interface BatchChunkJobPayload extends TenantJobPayload {
+  batch_id: string;
+  business_id?: string;
+  chunk_index: number;
+  total_chunks: number;
+  operation_type: 'WHATSAPP_TESTIMONIAL_REQUESTS' | 'CUSTOMER_IMPORT' | 'CAMPAIGN_DISPATCH' | string;
+  item_ids?: string[];
+  items?: Record<string, any>[];
+  params?: Record<string, any>;
+  idempotency_key: string;
+}
+
+/**
  * Standard Queue Job Execution Result.
  */
 export interface JobExecutionResult<T = any> {

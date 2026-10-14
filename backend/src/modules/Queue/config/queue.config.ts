@@ -184,3 +184,45 @@ export function sanitizeRedisConfig(config: RedisConnectionConfig): {
     hasPassword: Boolean(config.password),
   };
 }
+
+export interface BatchConfig {
+  chunkSize: number;
+  maxItems: number;
+  concurrency: number;
+}
+
+/**
+ * Validated batch processing limits and tuning parameters.
+ */
+export function getBatchSettings(configService?: ConfigService): BatchConfig {
+  const chunkSize = parseInt(
+    String(
+      configService?.get<string>('BATCH_CHUNK_SIZE') ||
+        process.env.BATCH_CHUNK_SIZE ||
+        '50',
+    ),
+    10,
+  );
+  const maxItems = parseInt(
+    String(
+      configService?.get<string>('BATCH_MAX_ITEMS') ||
+        process.env.BATCH_MAX_ITEMS ||
+        '5000',
+    ),
+    10,
+  );
+  const concurrency = parseInt(
+    String(
+      configService?.get<string>('BATCH_WORKER_CONCURRENCY') ||
+        process.env.BATCH_WORKER_CONCURRENCY ||
+        '3',
+    ),
+    10,
+  );
+
+  return {
+    chunkSize: isNaN(chunkSize) || chunkSize <= 0 ? 50 : Math.min(chunkSize, 250),
+    maxItems: isNaN(maxItems) || maxItems <= 0 ? 5000 : Math.min(maxItems, 10000),
+    concurrency: isNaN(concurrency) || concurrency <= 0 ? 3 : Math.min(concurrency, 10),
+  };
+}

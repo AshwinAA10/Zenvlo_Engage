@@ -7,11 +7,15 @@ import {
   QUEUE_MESSAGES,
   QUEUE_CAMPAIGNS,
   QUEUE_WHATSAPP_OUTBOUND,
+  QUEUE_BATCH_OPERATIONS,
 } from '../../common/constants';
 import { QueueService } from './services/queue.service';
 import { QueueHealthService } from './services/queue-health.service';
 import { QueueAdminService } from './services/queue-admin.service';
 import { QueueAdminController } from './controllers/queue-admin.controller';
+import { BatchService } from './services/batch.service';
+import { BatchProcessor } from './processors/batch.processor';
+import { BatchController } from './controllers/batch.controller';
 import { WebhookProcessor } from './processors/webhook.processor';
 import { SystemProcessor } from './processors/system.processor';
 import { WhatsAppOutboundProcessor } from './processors/whatsapp-outbound.processor';
@@ -24,7 +28,7 @@ const isWorkersEnabled = (): boolean => {
 };
 
 const defaultWorkerProviders = isWorkersEnabled()
-  ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor]
+  ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor, BatchProcessor]
   : [];
 
 @Module({
@@ -43,18 +47,20 @@ const defaultWorkerProviders = isWorkersEnabled()
       { name: QUEUE_MESSAGES },
       { name: QUEUE_CAMPAIGNS },
       { name: QUEUE_WHATSAPP_OUTBOUND },
+      { name: QUEUE_BATCH_OPERATIONS },
     ),
     IntegrationModule,
     BillingModule,
   ],
-  controllers: [QueueAdminController],
+  controllers: [QueueAdminController, BatchController],
   providers: [
     QueueService,
     QueueHealthService,
     QueueAdminService,
+    BatchService,
     ...defaultWorkerProviders,
   ],
-  exports: [QueueService, QueueHealthService, QueueAdminService, BullModule],
+  exports: [QueueService, QueueHealthService, QueueAdminService, BatchService, BullModule],
 })
 export class QueueModule {
   /**
@@ -64,7 +70,7 @@ export class QueueModule {
   static register(options?: { enableWorkers?: boolean }): DynamicModule {
     const enable = options?.enableWorkers ?? isWorkersEnabled();
     const workers = enable
-      ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor]
+      ? [WebhookProcessor, SystemProcessor, WhatsAppOutboundProcessor, BatchProcessor]
       : [];
 
     return {
@@ -76,13 +82,14 @@ export class QueueModule {
           { name: QUEUE_MESSAGES },
           { name: QUEUE_CAMPAIGNS },
           { name: QUEUE_WHATSAPP_OUTBOUND },
+          { name: QUEUE_BATCH_OPERATIONS },
         ),
         IntegrationModule,
         BillingModule,
       ],
-      controllers: [QueueAdminController],
-      providers: [QueueService, QueueHealthService, QueueAdminService, ...workers],
-      exports: [QueueService, QueueHealthService, QueueAdminService, BullModule],
+      controllers: [QueueAdminController, BatchController],
+      providers: [QueueService, QueueHealthService, QueueAdminService, BatchService, ...workers],
+      exports: [QueueService, QueueHealthService, QueueAdminService, BatchService, BullModule],
     };
   }
 }

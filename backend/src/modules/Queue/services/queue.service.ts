@@ -7,6 +7,7 @@ import {
   QUEUE_MESSAGES,
   QUEUE_CAMPAIGNS,
   QUEUE_WHATSAPP_OUTBOUND,
+  QUEUE_BATCH_OPERATIONS,
   JOB_SYSTEM_PING,
   JOB_SYSTEM_CLEANUP,
   JOB_META_WEBHOOK,
@@ -35,6 +36,7 @@ export class QueueService implements OnApplicationShutdown {
     @InjectQueue(QUEUE_MESSAGES) private readonly messageQueue: Queue,
     @InjectQueue(QUEUE_CAMPAIGNS) private readonly campaignQueue: Queue,
     @Optional() @InjectQueue(QUEUE_WHATSAPP_OUTBOUND) private readonly whatsappOutboundQueue?: Queue,
+    @Optional() @InjectQueue(QUEUE_BATCH_OPERATIONS) private readonly batchOperationsQueue?: Queue,
   ) {
     this.queueMap = new Map<string, Queue>([
       [QUEUE_SYSTEM, this.systemQueue],
@@ -44,6 +46,9 @@ export class QueueService implements OnApplicationShutdown {
     ]);
     if (this.whatsappOutboundQueue) {
       this.queueMap.set(QUEUE_WHATSAPP_OUTBOUND, this.whatsappOutboundQueue);
+    }
+    if (this.batchOperationsQueue) {
+      this.queueMap.set(QUEUE_BATCH_OPERATIONS, this.batchOperationsQueue);
     }
   }
 
