@@ -32,12 +32,18 @@ export interface SystemCleanupJobPayload extends BaseJobPayload {
 export type SystemJobPayload = SystemPingJobPayload | SystemCleanupJobPayload;
 
 /**
- * Inbound webhook job payload.
+ * Inbound webhook job payload supporting durable event dispatch and asynchronous processing.
  */
 export interface WebhookJobPayload extends BaseJobPayload {
-  object: string;
-  entry: any[];
+  inbound_event_id?: string;
+  provider?: 'zenvlo_engage' | 'meta_whatsapp' | 'razorpay' | string;
+  event_id?: string;
+  event_type?: string;
+  object?: string;
+  entry?: any[];
   raw_timestamp?: number | string;
+  business_id?: string;
+  payload?: any;
 }
 
 /**

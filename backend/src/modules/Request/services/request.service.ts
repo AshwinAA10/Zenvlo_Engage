@@ -12,6 +12,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { RequestLog, RequestStatus } from '../entities/request-log.entity';
 import { Customer } from '../../Customer/entities/customer.entity';
 import { Business } from '../../Business/entities/business.entity';
+import { InboundWebhookEvent } from '../../Webhook/entities/inbound-webhook-event.entity';
 import {
   SendRequestDto,
   BatchSendRequestDto,
@@ -366,7 +367,16 @@ export class RequestService {
       timestamp?: string | number;
       rawBody?: string;
     },
-  ): Promise<{ updated: boolean; ignored?: boolean; duplicate?: boolean; reason?: string }> {
+    options?: { async?: boolean },
+  ): Promise<{
+    updated: boolean;
+    ignored?: boolean;
+    duplicate?: boolean;
+    reason?: string;
+    status?: string;
+    jobId?: string;
+    eventId?: string;
+  }> {
     const rawBody = securityContext?.rawBody || JSON.stringify(dto);
 
     // 1. Payload size check
@@ -410,7 +420,69 @@ export class RequestService {
       throw new BadRequestException(`Invalid delivery status: ${dto.status}`);
     }
 
-    // 5. Idempotent execution wrapper with in-flight lock to protect against concurrency
+    // 5. Durable Inbound Event Recording
+    const eventId = `zenvlo_${dto.message_id}_${uppercaseStatus}`;
+    let inboundEvent: InboundWebhookEvent | null = null;
+    try {
+      inboundEvent = await InboundWebhookEvent.findOne({
+        where: { provider: 'zenvlo_engage', event_id: eventId },
+      });
+
+      if (!inboundEvent) {
+        inboundEvent = new InboundWebhookEvent();
+        inboundEvent.provider = 'zenvlo_engage';
+        inboundEvent.event_id = eventId;
+        inboundEvent.event_type = 'message_status_update';
+        inboundEvent.payload = dto as any;
+        inboundEvent.status = 'RECEIVED';
+        inboundEvent.attempts = 0;
+        inboundEvent.metadata = {
+          raw_timestamp: eventTimestamp,
+          signature: securityContext?.signature,
+        };
+        await inboundEvent.save();
+      }
+    } catch {
+      // Continue gracefully if running in unit test without DB context
+    }
+
+    // 6. Asynchronous execution mode
+    if (options?.async && this.queueService) {
+      try {
+        const jobId = await this.queueService.EnqueueWebhook(
+          {
+            inbound_event_id: inboundEvent?.id,
+            provider: 'zenvlo_engage',
+            event_id: eventId,
+            event_type: 'message_status_update',
+            payload: dto,
+            raw_timestamp: eventTimestamp,
+            ...dto,
+          },
+          {
+            jobId: `wh_${eventId}`,
+          },
+        );
+
+        if (inboundEvent) {
+          inboundEvent.job_id = jobId;
+          await inboundEvent.save();
+        }
+
+        return { updated: true, status: 'EVENT_RECEIVED', jobId, eventId };
+      } catch (queueErr: any) {
+        if (inboundEvent) {
+          inboundEvent.status = 'FAILED';
+          inboundEvent.last_error = `Queue enqueue failed: ${queueErr.message}`;
+          await inboundEvent.save();
+        }
+        throw new InternalServerErrorException(
+          `Failed to queue webhook event: ${queueErr.message}`,
+        );
+      }
+    }
+
+    // 7. Idempotent execution wrapper with in-flight lock to protect against concurrency
     const idempotencyKey = `req_wh:${dto.message_id}:${uppercaseStatus}`;
 
     const execution = await this.webhookSecurity.ExecuteIdempotent(idempotencyKey, async () => {

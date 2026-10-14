@@ -112,10 +112,14 @@ export class RequestController {
       ? (Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : String(req.rawBody))
       : JSON.stringify(dto);
 
-    return this.requestService.HandleWebhook(dto, {
-      signature: zenvloSig || hubSig,
-      timestamp: zenvloTs || hubTs || dto.timestamp,
-      rawBody,
-    });
+    return this.requestService.HandleWebhook(
+      dto,
+      {
+        signature: zenvloSig || hubSig,
+        timestamp: zenvloTs || hubTs || dto.timestamp,
+        rawBody,
+      },
+      { async: true },
+    );
   }
 }

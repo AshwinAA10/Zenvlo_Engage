@@ -99,4 +99,43 @@ export class WebhookController {
   async Delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.webhookService.Delete(id);
   }
+
+  @Get('inbound')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List durable inbound webhook events' })
+  async GetInboundEvents(
+    @Req() req: any,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    const businessId = req.user.business_id;
+    return this.webhookService.GetInboundEvents(businessId, { status, page, limit });
+  }
+
+  @Get('inbound/:id')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get inbound webhook event by ID' })
+  async GetInboundEventById(
+    @Req() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const businessId = req.user.business_id;
+    return this.webhookService.GetInboundEventById(businessId, id);
+  }
+
+  @Post('inbound/:id/replay')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Replay a failed inbound webhook event' })
+  async ReplayInboundEvent(
+    @Req() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const businessId = req.user.business_id;
+    const actorId = req.user.id || req.user.user_id || businessId;
+    return this.webhookService.ReplayInboundEvent(businessId, id, actorId);
+  }
 }
