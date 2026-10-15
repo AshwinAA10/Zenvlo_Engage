@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, MaxLength, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  MaxLength,
+  IsUrl,
+  IsBoolean,
+  IsNumber,
+  IsArray,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class OnboardingDto {
@@ -113,4 +122,71 @@ export class BusinessResponseDto {
 
   @ApiProperty()
   updated_on: Date;
+}
+
+export class OnboardingStatusResponseDto {
+  @ApiProperty()
+  business_id: string;
+
+  @ApiProperty()
+  completed: boolean;
+
+  @ApiProperty()
+  dismissed: boolean;
+
+  @ApiProperty()
+  current_step: number;
+
+  @ApiProperty({ type: [String] })
+  completed_steps: string[];
+
+  @ApiProperty({ type: [String] })
+  skipped_steps: string[];
+
+  @ApiProperty()
+  has_profile: boolean;
+
+  @ApiProperty()
+  has_customer: boolean;
+
+  @ApiProperty()
+  has_request: boolean;
+
+  @ApiProperty()
+  has_testimonial: boolean;
+
+  @ApiProperty()
+  has_widget: boolean;
+
+  @ApiPropertyOptional()
+  last_updated_at?: string;
+}
+
+export class UpdateOnboardingStatusDto {
+  @ApiPropertyOptional({ description: 'Mark overall onboarding as completed' })
+  @IsBoolean()
+  @IsOptional()
+  completed?: boolean;
+
+  @ApiPropertyOptional({ description: 'Dismiss the welcome/onboarding experience' })
+  @IsBoolean()
+  @IsOptional()
+  dismissed?: boolean;
+
+  @ApiPropertyOptional({ description: 'Current active setup step (1-based)' })
+  @IsNumber()
+  @IsOptional()
+  current_step?: number;
+
+  @ApiPropertyOptional({ description: 'Step IDs marked complete', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  completed_steps?: string[];
+
+  @ApiPropertyOptional({ description: 'Step IDs skipped', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  skipped_steps?: string[];
 }

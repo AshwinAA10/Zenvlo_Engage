@@ -102,4 +102,54 @@ describe('OnboardingPage Integration Tests', () => {
       await screen.findByText(/business slug already in use/i)
     ).toBeInTheDocument();
   });
+
+  it('renders accessible progress indicator with percentage', () => {
+    renderWithProviders(<OnboardingPage />);
+
+    const progressBar = screen.getByRole('progressbar', { name: /onboarding progress/i });
+    expect(progressBar).toBeInTheDocument();
+    expect(progressBar).toHaveAttribute('aria-valuenow', '33');
+    expect(screen.getByText(/33% complete/i)).toBeInTheDocument();
+  });
+
+  it('allows skipping optional steps to advance to step 2 without submitting', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<OnboardingPage />);
+
+    const skipBtn = screen.getByRole('button', { name: /skip optional steps/i });
+    await user.click(skipBtn);
+
+    expect(
+      await screen.findByRole('heading', { name: /your public testimonial link/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/66% complete/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy link/i })).toBeInTheDocument();
+  });
+
+  it('resumes saved onboarding step from backend status', async () => {
+    server.use(
+      http.get('*/api/business/onboarding-status', () => {
+        return HttpResponse.json({
+          business_id: 'bus-123',
+          completed: false,
+          dismissed: false,
+          current_step: 2,
+          completed_steps: ['profile'],
+          skipped_steps: [],
+          has_profile: true,
+          has_customer: false,
+          has_request: false,
+          has_testimonial: false,
+          has_widget: false,
+        });
+      })
+    );
+
+    renderWithProviders(<OnboardingPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: /your public testimonial link/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/step 2 of 3/i)).toBeInTheDocument();
+  });
 });

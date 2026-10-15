@@ -50,4 +50,88 @@ describe('BusinessService', () => {
 
     expect(result.slug).toBe('spa-oasis-1');
   });
+
+  describe('GetOnboardingStatus and UpdateOnboardingStatus', () => {
+    it('should derive onboarding status and steps from business entity and real state', async () => {
+      const mockBusiness = {
+        id: 'bus-789',
+        name: 'Aura Laser Clinic',
+        category: 'Healthcare & Clinic',
+        phone: '+919876543210',
+        settings: {
+          onboarding: {
+            current_step: 1,
+            completed_steps: ['profile'],
+            skipped_steps: [],
+            dismissed: false,
+            completed: false,
+          },
+        },
+      };
+
+      jest.spyOn(service, 'GetById').mockResolvedValue(mockBusiness as any);
+
+      const status = await service.GetOnboardingStatus('bus-789');
+
+      expect(status.business_id).toBe('bus-789');
+      expect(status.has_profile).toBe(true);
+      expect(status.completed_steps).toContain('profile');
+      expect(status.completed).toBe(false);
+      expect(status.dismissed).toBe(false);
+      expect(status.current_step).toBe(1);
+    });
+
+    it('should persist updated onboarding state into business.settings without falsifying completion', async () => {
+      const mockBusiness: any = {
+        id: 'bus-789',
+        name: 'Aura Laser Clinic',
+        category: 'Healthcare & Clinic',
+        phone: '+919876543210',
+        settings: {},
+        save: jest.fn().mockImplementation(function (this: any) {
+          return Promise.resolve(this);
+        }),
+      };
+
+      jest.spyOn(service, 'GetById').mockResolvedValue(mockBusiness);
+
+      const updated = await service.UpdateOnboardingStatus('bus-789', 'user-123', {
+        current_step: 2,
+        skipped_steps: ['optional_logo'],
+        dismissed: false,
+      });
+
+      expect(mockBusiness.save).toHaveBeenCalled();
+      expect(mockBusiness.settings.onboarding).toBeDefined();
+      expect(mockBusiness.settings.onboarding.current_step).toBe(2);
+      expect(mockBusiness.settings.onboarding.skipped_steps).toContain('optional_logo');
+      expect(updated.skipped_steps).toContain('optional_logo');
+      expect(updated.completed).toBe(false);
+    });
+
+    it('should mark onboarding completed when requested', async () => {
+      const mockBusiness: any = {
+        id: 'bus-789',
+        name: 'Aura Laser Clinic',
+        category: 'Healthcare & Clinic',
+        phone: '+919876543210',
+        settings: {},
+        save: jest.fn().mockImplementation(function (this: any) {
+          return Promise.resolve(this);
+        }),
+      };
+
+      jest.spyOn(service, 'GetById').mockResolvedValue(mockBusiness);
+
+      const updated = await service.UpdateOnboardingStatus('bus-789', 'user-123', {
+        completed: true,
+        dismissed: true,
+        completed_steps: ['profile', 'channel', 'first_milestone'],
+      });
+
+      expect(mockBusiness.save).toHaveBeenCalled();
+      expect(updated.completed).toBe(true);
+      expect(updated.dismissed).toBe(true);
+    });
+  });
 });

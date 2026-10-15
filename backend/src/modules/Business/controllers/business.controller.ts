@@ -11,7 +11,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BusinessService } from '../services/business.service';
-import { OnboardingDto, UpdateBusinessDto, BusinessResponseDto } from '../models/business.dto';
+import {
+  OnboardingDto,
+  UpdateBusinessDto,
+  BusinessResponseDto,
+  OnboardingStatusResponseDto,
+  UpdateOnboardingStatusDto,
+} from '../models/business.dto';
 import { JwtAuthGuard } from '../../../guards/jwt-auth.guard';
 
 @ApiTags('Business')
@@ -27,6 +33,37 @@ export class BusinessController {
   async Onboard(@Req() req: any, @Body() dto: OnboardingDto): Promise<BusinessResponseDto> {
     const userId = req.user.id || req.user.sub;
     return this.businessService.InsertOnboarding(userId, dto);
+  }
+
+  @Get('onboarding-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Retrieve verified onboarding and guided setup progress' })
+  @ApiResponse({ status: 200, type: OnboardingStatusResponseDto })
+  async GetOnboardingStatus(@Req() req: any): Promise<OnboardingStatusResponseDto> {
+    const userId = req.user.id || req.user.sub;
+    const business = await this.businessService.GetByUser(userId);
+    if (!business) {
+      throw new NotFoundException('Business profile not found. Please complete onboarding.');
+    }
+    return this.businessService.GetOnboardingStatus(business.id);
+  }
+
+  @Patch('onboarding-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update persistent onboarding state, step progress, or dismissal' })
+  @ApiResponse({ status: 200, type: OnboardingStatusResponseDto })
+  async UpdateOnboardingStatus(
+    @Req() req: any,
+    @Body() dto: UpdateOnboardingStatusDto,
+  ): Promise<OnboardingStatusResponseDto> {
+    const userId = req.user.id || req.user.sub;
+    const business = await this.businessService.GetByUser(userId);
+    if (!business) {
+      throw new NotFoundException('Business profile not found.');
+    }
+    return this.businessService.UpdateOnboardingStatus(business.id, userId, dto);
   }
 
   @Get('profile')
