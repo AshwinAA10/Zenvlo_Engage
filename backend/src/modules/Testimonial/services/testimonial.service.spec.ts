@@ -77,7 +77,92 @@ describe('TestimonialService', () => {
     expect(approved.approval_status).toBe('APPROVED');
     expect(approved.approved_at).toBeDefined();
     expect(approved.approved_by_id).toBe('usr-owner-1');
+    expect(approved.rejection_reason).toBeNull();
   });
+
+  it('should support full moderation lifecycle transitions: APPROVED -> REJECTED and REJECTED -> PENDING', async () => {
+    const existing = new Testimonial();
+    existing.id = 'testi-lifecycle';
+    existing.business_id = 'bus-1';
+    existing.approval_status = 'APPROVED';
+    existing.approved_at = new Date();
+    existing.approved_by_id = 'usr-1';
+
+    jest.spyOn(Testimonial, 'findOne').mockResolvedValue(existing as any);
+    jest.spyOn(existing, 'save').mockResolvedValue(existing as any);
+
+    // Transition: APPROVED -> REJECTED
+    const rejected = await service.UpdateStatus(
+      'bus-1',
+      'testi-lifecycle',
+      { status: 'REJECTED' as any, rejection_reason: 'Offensive language' },
+      'usr-moderator-2',
+    );
+
+    expect(rejected.approval_status).toBe('REJECTED');
+    expect(rejected.approved_at).toBeNull();
+    expect(rejected.approved_by_id).toBeNull();
+    expect(rejected.rejection_reason).toBe('Offensive language');
+
+    // Transition: REJECTED -> PENDING (re-queued for moderation)
+    const requeued = await service.UpdateStatus(
+      'bus-1',
+      'testi-lifecycle',
+      { status: 'PENDING' as any },
+      'usr-moderator-2',
+    );
+
+    expect(requeued.approval_status).toBe('PENDING');
+    expect(requeued.approved_at).toBeNull();
+    expect(requeued.approved_by_id).toBeNull();
+    expect(requeued.rejection_reason).toBeNull();
+  });
+
+  it('should batch update multiple testimonials with BulkUpdateStatus', async () => {
+    const t1 = new Testimonial();
+    t1.id = 'testi-b1';
+    t1.business_id = 'bus-1';
+    t1.approval_status = 'PENDING';
+
+    const t2 = new Testimonial();
+    t2.id = 'testi-b2';
+    t2.business_id = 'bus-1';
+    t2.approval_status = 'PENDING';
+
+    jest.spyOn(Testimonial, 'find').mockResolvedValue([t1, t2] as any);
+    jest.spyOn(Testimonial, 'save').mockResolvedValue([t1, t2] as any);
+
+    const result = await service.BulkUpdateStatus(
+      'bus-1',
+      {
+        ids: ['testi-b1', 'testi-b2'],
+        status: 'APPROVED' as any,
+      },
+      'usr-owner-1',
+    );
+
+    expect(result.updated_count).toBe(2);
+    expect(result.status).toBe('APPROVED');
+    expect(t1.approval_status).toBe('APPROVED');
+    expect(t1.approved_by_id).toBe('usr-owner-1');
+    expect(t2.approval_status).toBe('APPROVED');
+    expect(t2.approved_by_id).toBe('usr-owner-1');
+  });
+
+  it('should handle BulkUpdateStatus with empty ID array safely', async () => {
+    const result = await service.BulkUpdateStatus(
+      'bus-1',
+      {
+        ids: [],
+        status: 'APPROVED' as any,
+      },
+      'usr-owner-1',
+    );
+
+    expect(result.updated_count).toBe(0);
+    expect(result.status).toBe('APPROVED');
+  });
+
 
   it('should enforce quota via UsageService and reject submission when limit reached', async () => {
     const mockUsageService = {

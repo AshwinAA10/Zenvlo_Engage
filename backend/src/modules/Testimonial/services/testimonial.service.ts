@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Optional,
 } from '@nestjs/common';
+import { In } from 'typeorm';
 import { Testimonial, ApprovalStatus } from '../entities/testimonial.entity';
 import { Business } from '../../Business/entities/business.entity';
 import { Customer } from '../../Customer/entities/customer.entity';
@@ -12,6 +13,7 @@ import { UsageService } from '../../Billing/services/usage.service';
 import {
   SubmitPublicTestimonialDto,
   UpdateTestimonialStatusDto,
+  BulkUpdateTestimonialsDto,
   TestimonialQueryDto,
 } from '../models/testimonial.dto';
 
@@ -133,6 +135,7 @@ export class TestimonialService {
     total: number;
     page: number;
     limit: number;
+    total_pages: number;
     counts: {
       total: number;
       pending: number;
@@ -155,11 +158,38 @@ export class TestimonialService {
       });
     }
 
-    qb.orderBy('testimonial.created_on', 'DESC')
+    if (query.search && query.search.trim()) {
+      qb.andWhere(
+        '(LOWER(testimonial.customer_name) LIKE :search OR LOWER(testimonial.content) LIKE :search)',
+        { search: `%${query.search.toLowerCase().trim()}%` },
+      );
+    }
+
+    if (query.rating && query.rating >= 1 && query.rating <= 5) {
+      qb.andWhere('testimonial.rating = :rating', { rating: query.rating });
+    }
+
+    if (query.mediaFilter === 'MEDIA_ONLY') {
+      qb.andWhere(
+        '(testimonial.photo_url IS NOT NULL OR testimonial.video_url IS NOT NULL)',
+      );
+    } else if (query.mediaFilter === 'TEXT_ONLY') {
+      qb.andWhere(
+        '(testimonial.photo_url IS NULL AND testimonial.video_url IS NULL)',
+      );
+    }
+
+    const sortField =
+      query.sortBy === 'rating' ? 'testimonial.rating' : 'testimonial.created_on';
+    const sortOrder =
+      query.sortOrder && query.sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    qb.orderBy(sortField, sortOrder)
       .skip(skip)
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+    const total_pages = Math.ceil(total / limit) || 1;
 
     // Summary counts for dashboard tabs & metrics
     const allBusinessTestimonials = await Testimonial.find({
@@ -188,6 +218,7 @@ export class TestimonialService {
       total,
       page,
       limit,
+      total_pages,
       counts: {
         total: allBusinessTestimonials.length,
         pending,
@@ -226,10 +257,61 @@ export class TestimonialService {
     } else if (dto.status === 'REJECTED') {
       testimonial.approved_at = null;
       testimonial.approved_by_id = null;
-      testimonial.rejection_reason = dto.rejection_reason || 'Rejected by business owner';
+      testimonial.rejection_reason = dto.rejection_reason || 'Rejected by business moderator';
+    } else if (dto.status === 'PENDING') {
+      testimonial.approved_at = null;
+      testimonial.approved_by_id = null;
+      testimonial.rejection_reason = null;
     }
 
     return testimonial.save();
+  }
+
+  async BulkUpdateStatus(
+    businessId: string,
+    dto: BulkUpdateTestimonialsDto,
+    userId: string,
+  ): Promise<{ updated_count: number; status: ApprovalStatus }> {
+    if (!dto.ids || dto.ids.length === 0) {
+      return { updated_count: 0, status: dto.status as ApprovalStatus };
+    }
+
+    const testimonials = await Testimonial.find({
+      where: {
+        business_id: businessId,
+        id: In(dto.ids),
+        status: 1,
+      },
+    });
+
+    const now = new Date();
+    for (const t of testimonials) {
+      t.approval_status = dto.status as ApprovalStatus;
+      t.updated_by_id = userId;
+
+      if (dto.status === 'APPROVED') {
+        t.approved_at = now;
+        t.approved_by_id = userId;
+        t.rejection_reason = null;
+      } else if (dto.status === 'REJECTED') {
+        t.approved_at = null;
+        t.approved_by_id = null;
+        t.rejection_reason = dto.rejection_reason || 'Rejected by business moderator in batch';
+      } else if (dto.status === 'PENDING') {
+        t.approved_at = null;
+        t.approved_by_id = null;
+        t.rejection_reason = null;
+      }
+    }
+
+    if (testimonials.length > 0) {
+      await Testimonial.save(testimonials);
+    }
+
+    return {
+      updated_count: testimonials.length,
+      status: dto.status as ApprovalStatus,
+    };
   }
 
   async Delete(businessId: string, id: string): Promise<void> {
@@ -237,3 +319,4 @@ export class TestimonialService {
     await testimonial.softRemove();
   }
 }
+
