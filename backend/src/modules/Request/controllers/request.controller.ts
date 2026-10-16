@@ -25,6 +25,8 @@ import {
   RequestQueryDto,
   WhatsAppWebhookDto,
   RequestStatsDto,
+  RequestAnalyticsQueryDto,
+  RequestAnalyticsResponseDto,
 } from '../models/request.dto';
 import { RequestLog } from '../entities/request-log.entity';
 
@@ -91,6 +93,22 @@ export class RequestController {
   async GetStats(@Req() req: any): Promise<RequestStatsDto> {
     const businessId = req.user.business_id;
     return this.requestService.GetRequestStats(businessId);
+  }
+
+  @Get('analytics')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Retrieve comprehensive, time-bounded WhatsApp request analytics, delivery verification, and response conversion',
+  })
+  @ApiResponse({ status: 200, type: RequestAnalyticsResponseDto })
+  async GetAnalytics(
+    @Req() req: any,
+    @Query() query: RequestAnalyticsQueryDto,
+  ): Promise<RequestAnalyticsResponseDto> {
+    const businessId = req.user.business_id;
+    return this.requestService.GetRequestAnalytics(businessId, query);
   }
 
   @Post('webhook')
