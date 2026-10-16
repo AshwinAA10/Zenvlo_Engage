@@ -32,6 +32,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { apiClient } from '@/lib/axios';
+import { GettingStartedChecklist } from '@/components/GettingStartedChecklist';
 
 interface OnboardingStatus {
   business_id: string;
@@ -364,6 +365,9 @@ export default function DashboardOverviewPage() {
           </Card>
         </Link>
       </div>
+
+      {/* Getting Started Persistent Checklist */}
+      <GettingStartedChecklist />
 
       {/* Core Workflow Overview */}
       <div className="p-6 rounded-2xl bg-card border border-border space-y-4">

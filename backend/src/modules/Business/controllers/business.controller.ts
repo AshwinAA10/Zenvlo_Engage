@@ -17,6 +17,8 @@ import {
   BusinessResponseDto,
   OnboardingStatusResponseDto,
   UpdateOnboardingStatusDto,
+  ChecklistStatusResponseDto,
+  UpdateChecklistPreferencesDto,
 } from '../models/business.dto';
 import { JwtAuthGuard } from '../../../guards/jwt-auth.guard';
 
@@ -64,6 +66,37 @@ export class BusinessController {
       throw new NotFoundException('Business profile not found.');
     }
     return this.businessService.UpdateOnboardingStatus(business.id, userId, dto);
+  }
+
+  @Get('checklist')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Retrieve persistent getting started checklist progress and tasks' })
+  @ApiResponse({ status: 200, type: ChecklistStatusResponseDto })
+  async GetChecklist(@Req() req: any): Promise<ChecklistStatusResponseDto> {
+    const userId = req.user.id || req.user.sub;
+    const business = await this.businessService.GetByUser(userId);
+    if (!business) {
+      throw new NotFoundException('Business profile not found. Please complete onboarding.');
+    }
+    return this.businessService.GetChecklistStatus(business.id);
+  }
+
+  @Patch('checklist-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update persistent checklist presentation preferences (dismissed, collapsed)' })
+  @ApiResponse({ status: 200, type: ChecklistStatusResponseDto })
+  async UpdateChecklistPreferences(
+    @Req() req: any,
+    @Body() dto: UpdateChecklistPreferencesDto,
+  ): Promise<ChecklistStatusResponseDto> {
+    const userId = req.user.id || req.user.sub;
+    const business = await this.businessService.GetByUser(userId);
+    if (!business) {
+      throw new NotFoundException('Business profile not found.');
+    }
+    return this.businessService.UpdateChecklistPreferences(business.id, userId, dto);
   }
 
   @Get('profile')

@@ -190,3 +190,71 @@ export class UpdateOnboardingStatusDto {
   @IsOptional()
   skipped_steps?: string[];
 }
+
+export class ChecklistItemDto {
+  @ApiProperty({ example: 'profile' })
+  id: string;
+
+  @ApiProperty({ example: 'Complete Business Profile' })
+  title: string;
+
+  @ApiProperty({ example: 'Set up your business name, category, website, and branding for testimonial requests.' })
+  description: string;
+
+  @ApiProperty({ example: '/settings' })
+  action_url: string;
+
+  @ApiProperty({ example: 'Open Settings' })
+  action_label: string;
+
+  @ApiProperty({ example: true })
+  completed: boolean;
+
+  @ApiProperty({ example: false })
+  is_optional: boolean;
+
+  @ApiPropertyOptional({ example: 'Profile configured' })
+  status_hint?: string;
+}
+
+export class ChecklistStatusResponseDto {
+  @ApiProperty({ example: 'bus-123' })
+  business_id: string;
+
+  @ApiProperty({ example: 5 })
+  total_tasks: number;
+
+  @ApiProperty({ example: 2 })
+  completed_tasks: number;
+
+  @ApiProperty({ example: 40 })
+  progress_percentage: number;
+
+  @ApiProperty({ example: false })
+  all_completed: boolean;
+
+  @ApiProperty({ example: false })
+  dismissed: boolean;
+
+  @ApiProperty({ example: false })
+  collapsed: boolean;
+
+  @ApiProperty({ type: [ChecklistItemDto] })
+  tasks: ChecklistItemDto[];
+
+  @ApiPropertyOptional()
+  last_updated_at?: string;
+}
+
+export class UpdateChecklistPreferencesDto {
+  @ApiPropertyOptional({ description: 'Dismiss or hide the getting started checklist card' })
+  @IsBoolean()
+  @IsOptional()
+  dismissed?: boolean;
+
+  @ApiPropertyOptional({ description: 'Collapse or expand the checklist item list' })
+  @IsBoolean()
+  @IsOptional()
+  collapsed?: boolean;
+}
+

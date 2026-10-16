@@ -1,5 +1,9 @@
 import { BusinessService } from './business.service';
 import { Business } from '../entities/business.entity';
+import { Customer } from '../../Customer/entities/customer.entity';
+import { RequestLog } from '../../Request/entities/request-log.entity';
+import { Testimonial } from '../../Testimonial/entities/testimonial.entity';
+import { Widget } from '../../Widget/entities/widget.entity';
 
 describe('BusinessService', () => {
   let service: BusinessService;
@@ -134,4 +138,111 @@ describe('BusinessService', () => {
       expect(updated.dismissed).toBe(true);
     });
   });
+
+  describe('GetChecklistStatus and UpdateChecklistPreferences', () => {
+    it('should derive 5 authoritative checklist tasks and progress from real entity counts', async () => {
+      const mockBusiness: any = {
+        id: 'bus-101',
+        name: 'Apex Dental Care',
+        category: 'Dentistry',
+        phone: '+919123456789',
+        settings: {
+          checklist: {
+            dismissed: false,
+            collapsed: false,
+          },
+        },
+      };
+
+      jest.spyOn(service, 'GetById').mockResolvedValue(mockBusiness);
+      jest.spyOn(Customer, 'count').mockResolvedValue(2);
+      jest.spyOn(RequestLog, 'count').mockResolvedValue(0);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(0);
+      jest.spyOn(Widget, 'count').mockResolvedValue(0);
+
+      const checklist = await service.GetChecklistStatus('bus-101');
+
+      expect(checklist.business_id).toBe('bus-101');
+      expect(checklist.total_tasks).toBe(5);
+      // profile is true (has name & category), customer is true (count=2), request=false, testimonial=false, widget=false
+      expect(checklist.completed_tasks).toBe(2);
+      expect(checklist.progress_percentage).toBe(40);
+      expect(checklist.all_completed).toBe(false);
+      expect(checklist.dismissed).toBe(false);
+      expect(checklist.collapsed).toBe(false);
+
+      const profileTask = checklist.tasks.find((t) => t.id === 'profile');
+      expect(profileTask?.completed).toBe(true);
+      expect(profileTask?.action_url).toBe('/settings');
+
+      const customerTask = checklist.tasks.find((t) => t.id === 'customer');
+      expect(customerTask?.completed).toBe(true);
+      expect(customerTask?.status_hint).toBe('2 customers added');
+
+      const requestTask = checklist.tasks.find((t) => t.id === 'request');
+      expect(requestTask?.completed).toBe(false);
+      expect(requestTask?.action_url).toBe('/requests');
+
+      const widgetTask = checklist.tasks.find((t) => t.id === 'widget');
+      expect(widgetTask?.is_optional).toBe(true);
+    });
+
+    it('should calculate 100% and all_completed when all 5 tasks are completed', async () => {
+      const mockBusiness: any = {
+        id: 'bus-102',
+        name: 'Apex Dental Care',
+        category: 'Dentistry',
+        phone: '+919123456789',
+        settings: {},
+      };
+
+      jest.spyOn(service, 'GetById').mockResolvedValue(mockBusiness);
+      jest.spyOn(Customer, 'count').mockResolvedValue(5);
+      jest.spyOn(RequestLog, 'count').mockResolvedValue(3);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(1);
+      jest.spyOn(Widget, 'count').mockResolvedValue(1);
+
+      const checklist = await service.GetChecklistStatus('bus-102');
+
+      expect(checklist.total_tasks).toBe(5);
+      expect(checklist.completed_tasks).toBe(5);
+      expect(checklist.progress_percentage).toBe(100);
+      expect(checklist.all_completed).toBe(true);
+      expect(checklist.tasks.every((t) => t.completed)).toBe(true);
+    });
+
+    it('should update checklist presentation preferences without altering task completion', async () => {
+      const mockBusiness: any = {
+        id: 'bus-103',
+        name: 'Apex Dental Care',
+        category: 'Dentistry',
+        settings: {},
+        save: jest.fn().mockImplementation(function (this: any) {
+          return Promise.resolve(this);
+        }),
+      };
+
+      jest.spyOn(service, 'GetById').mockResolvedValue(mockBusiness);
+      jest.spyOn(Customer, 'count').mockResolvedValue(0);
+      jest.spyOn(RequestLog, 'count').mockResolvedValue(0);
+      jest.spyOn(Testimonial, 'count').mockResolvedValue(0);
+      jest.spyOn(Widget, 'count').mockResolvedValue(0);
+
+      const updated = await service.UpdateChecklistPreferences('bus-103', 'user-123', {
+        dismissed: true,
+        collapsed: true,
+      });
+
+      expect(mockBusiness.save).toHaveBeenCalled();
+      expect(mockBusiness.settings.checklist.dismissed).toBe(true);
+      expect(mockBusiness.settings.checklist.collapsed).toBe(true);
+      expect(updated.dismissed).toBe(true);
+      expect(updated.collapsed).toBe(true);
+      // Hiding/collapsing MUST NOT falsify task completion:
+      expect(updated.completed_tasks).toBe(1); // Only profile is complete
+      expect(updated.all_completed).toBe(false);
+      expect(updated.progress_percentage).toBe(20);
+    });
+  });
 });
+
