@@ -432,6 +432,31 @@ export const handlers = [
       logs: [],
     });
   }),
+
+  // --- ONBOARDING STATUS ---
+  http.get('*/api/business/onboarding-status', () => {
+    return HttpResponse.json({
+      business_id: 'biz-uuid-1',
+      completed: true,
+      dismissed: true,
+      current_step: 3,
+      completed_steps: ['profile', 'customer', 'request'],
+      skipped_steps: [],
+      has_profile: true,
+      has_customer: true,
+      has_request: true,
+      has_testimonial: true,
+      has_widget: true,
+    });
+  }),
+
+  http.patch('*/api/business/onboarding-status', async ({ request }) => {
+    const body = (await request.json()) as any;
+    return HttpResponse.json({
+      success: true,
+      ...body,
+    });
+  }),
 ];
 
 export const mockRequestAnalytics = {
