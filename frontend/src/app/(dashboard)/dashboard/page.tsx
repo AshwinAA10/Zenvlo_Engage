@@ -306,7 +306,8 @@ export default function DashboardOverviewPage() {
   if (!mounted) return null;
 
   const businessName = business?.name || 'Your Business';
-  const isIncomplete = onboardingStatus && !onboardingStatus.completed && !dismissBanner;
+  const isIncomplete =
+    onboardingStatus && !onboardingStatus.completed && !dismissBanner && !showWelcomeModal;
   const isBrandNewAccount =
     !loading && metrics.testimonialsTotal === 0 && metrics.requestsTotal === 0;
 
@@ -316,23 +317,49 @@ export default function DashboardOverviewPage() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-6 max-w-7xl mx-auto">
-        {/* Welcome Modal for newly activated users */}
-        <Dialog open={showWelcomeModal} onOpenChange={(open) => !open && handleDismissWelcome()}>
-          <DialogContent className="max-w-lg border-border bg-[#09090b] text-foreground p-6">
-            <DialogHeader className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[rgba(16,185,129,0.12)] border border-[#10B981]/30 text-[#10B981] text-xs font-semibold w-fit">
-                <Sparkles className="w-3.5 h-3.5" /> Welcome to Zenvlo Engage
+        {/* Welcome Experience for newly activated accounts */}
+        {showWelcomeModal && (
+          <div
+            role="region"
+            aria-label="Welcome to Zenvlo Engage"
+            className="p-6 rounded-2xl bg-card border border-[#10B981]/30 shadow-sm space-y-4 animate-in slide-in-from-top-2"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[rgba(16,185,129,0.12)] border border-[#10B981]/30 text-[#10B981] text-xs font-semibold w-fit">
+                  <Sparkles className="w-3.5 h-3.5" /> Welcome to Zenvlo Engage
+                </div>
+                <h2 className="text-xl font-bold tracking-tight text-foreground">
+                  Welcome aboard, {businessName}!
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                  Zenvlo Engage turns everyday customer conversations into high-converting website social proof. In 2 minutes, configure your profile and start collecting verified testimonials.
+                </p>
               </div>
-              <DialogTitle className="text-xl font-bold tracking-tight">
-                Welcome aboard, {businessName}!
-              </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                Zenvlo Engage turns everyday customer conversations into high-converting website social proof. In 2 minutes, configure your profile and start collecting verified testimonials.
-              </DialogDescription>
-            </DialogHeader>
 
-            <div className="space-y-3 py-2">
-              <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-start gap-3">
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDismissWelcome}
+                  className="text-xs"
+                >
+                  Explore Dashboard First
+                </Button>
+                <Link href="/onboarding">
+                  <Button
+                    size="sm"
+                    className="text-xs font-bold gap-1.5"
+                  >
+                    Start 2-Minute Guided Setup <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+              <div className="p-3.5 rounded-xl bg-muted/40 border border-border flex items-start gap-3">
                 <div className="w-6 h-6 rounded-lg bg-[rgba(16,185,129,0.15)] text-[#10B981] flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
                   1
                 </div>
@@ -342,7 +369,7 @@ export default function DashboardOverviewPage() {
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-start gap-3">
+              <div className="p-3.5 rounded-xl bg-muted/40 border border-border flex items-start gap-3">
                 <div className="w-6 h-6 rounded-lg bg-[rgba(16,185,129,0.15)] text-[#10B981] flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
                   2
                 </div>
@@ -352,7 +379,7 @@ export default function DashboardOverviewPage() {
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-start gap-3">
+              <div className="p-3.5 rounded-xl bg-muted/40 border border-border flex items-start gap-3">
                 <div className="w-6 h-6 rounded-lg bg-[rgba(16,185,129,0.15)] text-[#10B981] flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
                   3
                 </div>
@@ -362,31 +389,8 @@ export default function DashboardOverviewPage() {
                 </div>
               </div>
             </div>
-
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleDismissWelcome}
-                className="text-xs"
-              >
-                Explore Dashboard First
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  setShowWelcomeModal(false);
-                  router.push('/onboarding');
-                }}
-                className="text-xs font-bold gap-1.5"
-              >
-                Start 2-Minute Guided Setup <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+        )}
 
         {/* Setup Incomplete Recovery Banner */}
         {isIncomplete && (
