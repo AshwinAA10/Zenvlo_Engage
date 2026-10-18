@@ -383,4 +383,168 @@ export const handlers = [
       ],
     });
   }),
+
+  // --- REQUESTS & ANALYTICS ---
+  http.get('*/api/requests/analytics', () => {
+    return HttpResponse.json(mockRequestAnalytics);
+  }),
+
+  http.get('*/api/requests/stats', () => {
+    return HttpResponse.json({
+      total_sent: 12,
+      delivered: 9,
+      read: 6,
+      failed: 1,
+      pending_contract: 2,
+      feedback_received: 4,
+      delivery_rate: 90,
+      feedback_conversion_rate: 33,
+    });
+  }),
+
+  http.get('*/api/requests', () => {
+    return HttpResponse.json({
+      data: mockRequestLogs,
+      total: mockRequestLogs.length,
+      page: 1,
+      limit: 25,
+    });
+  }),
+
+  http.post('*/api/requests/send', async ({ request }) => {
+    const body = (await request.json()) as any;
+    return HttpResponse.json({
+      id: 'req-log-new',
+      customer_name: body.customer_name || 'New Customer',
+      customer_phone: body.customer_phone || '+919999988888',
+      channel: 'WHATSAPP',
+      delivery_status: 'QUEUED',
+      created_on: new Date().toISOString(),
+    });
+  }),
+
+  http.post('*/api/requests/batch', async ({ request }) => {
+    const body = (await request.json()) as any;
+    return HttpResponse.json({
+      total: body.customer_ids?.length || 2,
+      queued: body.customer_ids?.length || 2,
+      failed: 0,
+      logs: [],
+    });
+  }),
+
+  // --- ONBOARDING STATUS ---
+  http.get('*/api/business/onboarding-status', () => {
+    return HttpResponse.json({
+      business_id: 'biz-uuid-1',
+      completed: true,
+      dismissed: true,
+      current_step: 3,
+      completed_steps: ['profile', 'customer', 'request'],
+      skipped_steps: [],
+      has_profile: true,
+      has_customer: true,
+      has_request: true,
+      has_testimonial: true,
+      has_widget: true,
+    });
+  }),
+
+  http.patch('*/api/business/onboarding-status', async ({ request }) => {
+    const body = (await request.json()) as any;
+    return HttpResponse.json({
+      success: true,
+      ...body,
+    });
+  }),
 ];
+
+export const mockRequestAnalytics = {
+  period: {
+    startDate: '2026-09-15T00:00:00.000Z',
+    endDate: '2026-10-15T00:00:00.000Z',
+    prevStartDate: '2026-08-16T00:00:00.000Z',
+    prevEndDate: '2026-09-15T00:00:00.000Z',
+    days: 30,
+  },
+  summary: {
+    total_requests: 12,
+    confirmed_delivered: 9,
+    confirmed_read: 6,
+    confirmed_failed: 1,
+    pending_confirmation: 2,
+    feedback_responses: 4,
+    delivery_success_rate: 90.0,
+    overall_delivery_rate: 75.0,
+    response_rate_delivered: 44.4,
+    response_rate_total: 33.3,
+  },
+  comparison: {
+    prev_total_requests: 8,
+    prev_confirmed_delivered: 6,
+    prev_feedback_responses: 2,
+    total_requests_change_pct: 50.0,
+    delivered_change_pct: 50.0,
+    responses_change_pct: 100.0,
+  },
+  delivery_breakdown: [
+    { status: 'DELIVERED', count: 3, percentage: 25.0, is_terminal: true },
+    { status: 'READ', count: 6, percentage: 50.0, is_terminal: true },
+    { status: 'PENDING_CONTRACT', count: 2, percentage: 16.7, is_terminal: false },
+    { status: 'FAILED', count: 1, percentage: 8.3, is_terminal: true },
+  ],
+  trend: [
+    { date: '2026-10-01', created: 3, delivered: 2, read: 1, failed: 0, pending: 1, responses: 1 },
+    { date: '2026-10-02', created: 4, delivered: 3, read: 2, failed: 1, pending: 0, responses: 2 },
+    { date: '2026-10-03', created: 5, delivered: 4, read: 3, failed: 0, pending: 1, responses: 1 },
+  ],
+  meta: {
+    channel: 'WHATSAPP',
+    unknown_outcomes_count: 2,
+    semantics: {
+      delivery_success_rate: 'Known outcomes',
+    },
+  },
+};
+
+export const mockRequestLogs = [
+  {
+    id: 'req-log-1',
+    customer_id: 'cust-1',
+    customer_name: 'Rahul Sharma',
+    customer_phone: '+919988776655',
+    channel: 'WHATSAPP',
+    template_name: 'testimonial_request',
+    testimonial_url: 'http://localhost:3000/submit/zenvlo-wellness',
+    custom_message: 'Thanks for coming in!',
+    delivery_status: 'DELIVERED',
+    message_id: 'msg_101',
+    error_message: null,
+    sent_at: '2026-10-01T10:00:00.000Z',
+    delivered_at: '2026-10-01T10:02:00.000Z',
+    read_at: null,
+    testimonial_id: 'test-1',
+    response_received_at: '2026-10-01T12:00:00.000Z',
+    created_on: '2026-10-01T10:00:00.000Z',
+  },
+  {
+    id: 'req-log-2',
+    customer_id: 'cust-2',
+    customer_name: 'Priya Patel',
+    customer_phone: '+919988776644',
+    channel: 'WHATSAPP',
+    template_name: 'testimonial_request',
+    testimonial_url: 'http://localhost:3000/submit/zenvlo-wellness',
+    custom_message: null,
+    delivery_status: 'FAILED',
+    message_id: null,
+    error_message: 'Invalid phone number format',
+    sent_at: '2026-10-02T11:00:00.000Z',
+    delivered_at: null,
+    read_at: null,
+    testimonial_id: null,
+    response_received_at: null,
+    created_on: '2026-10-02T11:00:00.000Z',
+  },
+];
+

@@ -10,6 +10,10 @@ import {
   IsBoolean,
   Equals,
   IsEnum,
+  IsArray,
+  IsUUID,
+  ArrayMinSize,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -80,6 +84,27 @@ export class UpdateTestimonialStatusDto {
   rejection_reason?: string;
 }
 
+export class BulkUpdateTestimonialsDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Array of testimonial UUIDs to moderate',
+    example: ['d9b9a67d-94bb-4e9e-a83d-3a3d5e2a2c11'],
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @ArrayMinSize(1)
+  ids: string[];
+
+  @ApiProperty({ enum: ApprovalStatusEnum, example: ApprovalStatusEnum.APPROVED })
+  @IsEnum(ApprovalStatusEnum)
+  status: ApprovalStatusEnum;
+
+  @ApiPropertyOptional({ description: 'Optional reason for rejection if status is REJECTED' })
+  @IsString()
+  @IsOptional()
+  rejection_reason?: string;
+}
+
 export class TestimonialQueryDto {
   @ApiPropertyOptional({ enum: ['ALL', 'PENDING', 'APPROVED', 'REJECTED'], default: 'ALL' })
   @IsString()
@@ -100,7 +125,39 @@ export class TestimonialQueryDto {
   @IsOptional()
   @Type(() => Number)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Search customer name or review text' })
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @ApiPropertyOptional({ enum: ['created_on', 'rating'], default: 'created_on' })
+  @IsString()
+  @IsOptional()
+  @IsIn(['created_on', 'rating'])
+  sortBy?: string = 'created_on';
+
+  @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'DESC' })
+  @IsString()
+  @IsOptional()
+  @IsIn(['ASC', 'DESC', 'asc', 'desc'])
+  sortOrder?: 'ASC' | 'DESC' | 'asc' | 'desc' = 'DESC';
+
+  @ApiPropertyOptional({ enum: ['ALL', 'MEDIA_ONLY', 'TEXT_ONLY'], default: 'ALL' })
+  @IsString()
+  @IsOptional()
+  @IsIn(['ALL', 'MEDIA_ONLY', 'TEXT_ONLY'])
+  mediaFilter?: 'ALL' | 'MEDIA_ONLY' | 'TEXT_ONLY' = 'ALL';
+
+  @ApiPropertyOptional({ description: 'Filter by exact star rating 1-5', minimum: 1, maximum: 5 })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @IsOptional()
+  @Type(() => Number)
+  rating?: number;
 }
+
 
 export class PublicTestimonialResponseDto {
   @ApiProperty()

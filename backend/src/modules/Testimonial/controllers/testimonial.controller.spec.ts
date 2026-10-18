@@ -154,6 +154,7 @@ describe('TestimonialController (API & Integration)', () => {
         total: 0,
         page: 1,
         limit: 20,
+        total_pages: 1,
         counts: {
           total: 0,
           pending: 0,
@@ -166,6 +167,7 @@ describe('TestimonialController (API & Integration)', () => {
       const res = await controller.GetAll(mockReq, { status: 'ALL' });
       expect(testimonialService.GetAll).toHaveBeenCalledWith('bus-tenant-1', { status: 'ALL' });
       expect(res.total).toBe(0);
+      expect(res.total_pages).toBe(1);
     });
 
     it('GetById should strictly scope query to authenticated user businessId', async () => {
@@ -198,6 +200,27 @@ describe('TestimonialController (API & Integration)', () => {
         'usr-owner-1',
       );
       expect(res).toEqual(updated);
+    });
+
+    it('BulkUpdateStatus should pass businessId, batch dto, and userId', async () => {
+      (testimonialService as any).BulkUpdateStatus = jest.fn().mockResolvedValueOnce({
+        updated_count: 2,
+        status: 'APPROVED',
+      });
+
+      const dto = {
+        ids: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'],
+        status: ApprovalStatusEnum.APPROVED,
+      };
+
+      const res = await controller.BulkUpdateStatus(mockReq, dto as any);
+
+      expect(testimonialService.BulkUpdateStatus).toHaveBeenCalledWith(
+        'bus-tenant-1',
+        dto,
+        'usr-owner-1',
+      );
+      expect(res).toEqual({ updated_count: 2, status: 'APPROVED' });
     });
 
     it('Delete should strictly scope deletion to authenticated user businessId', async () => {

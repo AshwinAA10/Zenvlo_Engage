@@ -19,6 +19,10 @@ import {
   RequestQueryDto,
   WhatsAppWebhookDto,
   RequestStatsDto,
+  RequestAnalyticsQueryDto,
+  RequestAnalyticsResponseDto,
+  DeliveryBreakdownItemDto,
+  RequestTrendPointDto,
 } from '../models/request.dto';
 import {
   WHATSAPP_INTEGRATION_SERVICE,
@@ -357,6 +361,280 @@ export class RequestService {
       feedback_received,
       delivery_rate,
       feedback_conversion_rate,
+    };
+  }
+
+  async GetRequestAnalytics(
+    businessId: string,
+    query: RequestAnalyticsQueryDto,
+  ): Promise<RequestAnalyticsResponseDto> {
+    const now = new Date();
+    const endDate = query.endDate ? new Date(query.endDate) : now;
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('Invalid startDate or endDate format');
+    }
+
+    if (startDate > endDate) {
+      throw new BadRequestException('startDate cannot be after endDate');
+    }
+
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const maxDurationMs = 366 * 24 * 60 * 60 * 1000;
+    if (durationMs > maxDurationMs) {
+      throw new BadRequestException('Date range cannot exceed 366 days');
+    }
+
+    const prevStartDate = new Date(startDate.getTime() - durationMs);
+    const prevEndDate = new Date(startDate.getTime());
+    const days = Math.max(1, Math.round(durationMs / (24 * 60 * 60 * 1000)));
+
+    // 1. Fetch current cohort records (tenant-isolated and scoped to active records)
+    const currentQb = RequestLog.createQueryBuilder('log')
+      .where('log.business_id = :businessId', { businessId })
+      .andWhere('log.status = :activeStatus', { activeStatus: 1 })
+      .andWhere('log.created_on >= :startDate AND log.created_on <= :endDate', {
+        startDate,
+        endDate,
+      });
+
+    if (query.channel) {
+      currentQb.andWhere('log.channel = :channel', { channel: query.channel });
+    }
+
+    const currentLogs = await currentQb
+      .select([
+        'log.id',
+        'log.delivery_status',
+        'log.testimonial_id',
+        'log.created_on',
+        'log.delivered_at',
+        'log.read_at',
+        'log.response_received_at',
+      ])
+      .orderBy('log.created_on', 'ASC')
+      .getMany();
+
+    // 2. Fetch comparative previous cohort records
+    const prevQb = RequestLog.createQueryBuilder('log')
+      .where('log.business_id = :businessId', { businessId })
+      .andWhere('log.status = :activeStatus', { activeStatus: 1 })
+      .andWhere('log.created_on >= :prevStartDate AND log.created_on < :prevEndDate', {
+        prevStartDate,
+        prevEndDate,
+      });
+
+    if (query.channel) {
+      prevQb.andWhere('log.channel = :channel', { channel: query.channel });
+    }
+
+    const prevLogs = await prevQb
+      .select(['log.id', 'log.delivery_status', 'log.testimonial_id'])
+      .getMany();
+
+    // 3. Current period aggregation & metrics calculation
+    const total_requests = currentLogs.length;
+    let confirmed_delivered = 0;
+    let confirmed_read = 0;
+    let confirmed_failed = 0;
+    let pending_confirmation = 0;
+    let feedback_responses = 0;
+
+    const statusCounts: Record<string, number> = {};
+
+    for (const log of currentLogs) {
+      const status = log.delivery_status || 'UNKNOWN';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+      if (status === 'DELIVERED') {
+        confirmed_delivered++;
+      } else if (status === 'READ') {
+        confirmed_delivered++;
+        confirmed_read++;
+      } else if (status === 'FAILED') {
+        confirmed_failed++;
+      } else {
+        // QUEUED, PROCESSING, SUBMITTED, SENT, PENDING_CONTRACT, AMBIGUOUS
+        pending_confirmation++;
+      }
+
+      if (log.testimonial_id || log.response_received_at) {
+        feedback_responses++;
+      }
+    }
+
+    // Delivery success rate calculated strictly from known terminal outcomes
+    const knownOutcomes = confirmed_delivered + confirmed_failed;
+    const delivery_success_rate =
+      knownOutcomes > 0
+        ? Math.round((confirmed_delivered / knownOutcomes) * 1000) / 10
+        : null;
+
+    const overall_delivery_rate =
+      total_requests > 0
+        ? Math.round((confirmed_delivered / total_requests) * 1000) / 10
+        : 0;
+
+    const response_rate_delivered =
+      confirmed_delivered > 0
+        ? Math.round((feedback_responses / confirmed_delivered) * 1000) / 10
+        : null;
+
+    const response_rate_total =
+      total_requests > 0
+        ? Math.round((feedback_responses / total_requests) * 1000) / 10
+        : 0;
+
+    // 4. Comparative previous period metrics
+    const prev_total_requests = prevLogs.length;
+    let prev_confirmed_delivered = 0;
+    let prev_feedback_responses = 0;
+
+    for (const pLog of prevLogs) {
+      if (pLog.delivery_status === 'DELIVERED' || pLog.delivery_status === 'READ') {
+        prev_confirmed_delivered++;
+      }
+      if (pLog.testimonial_id) {
+        prev_feedback_responses++;
+      }
+    }
+
+    const calcDelta = (curr: number, prev: number): number | null => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return Math.round(((curr - prev) / prev) * 1000) / 10;
+    };
+
+    const total_requests_change_pct =
+      prev_total_requests > 0 || total_requests > 0
+        ? calcDelta(total_requests, prev_total_requests)
+        : null;
+
+    const delivered_change_pct =
+      prev_confirmed_delivered > 0 || confirmed_delivered > 0
+        ? calcDelta(confirmed_delivered, prev_confirmed_delivered)
+        : null;
+
+    const responses_change_pct =
+      prev_feedback_responses > 0 || feedback_responses > 0
+        ? calcDelta(feedback_responses, prev_feedback_responses)
+        : null;
+
+    // 5. Delivery status breakdown
+    const terminalStatuses = new Set(['DELIVERED', 'READ', 'FAILED']);
+    const delivery_breakdown: DeliveryBreakdownItemDto[] = Object.entries(statusCounts).map(
+      ([st, cnt]) => ({
+        status: st,
+        count: cnt,
+        percentage:
+          total_requests > 0
+            ? Math.round((cnt / total_requests) * 1000) / 10
+            : 0,
+        is_terminal: terminalStatuses.has(st),
+      }),
+    );
+
+    // 6. Time series trend generation (continuous daily buckets)
+    const trendMap = new Map<string, RequestTrendPointDto>();
+    const curDate = new Date(startDate);
+    curDate.setUTCHours(0, 0, 0, 0);
+    const endMidnight = new Date(endDate);
+    endMidnight.setUTCHours(23, 59, 59, 999);
+
+    while (curDate <= endMidnight) {
+      const dateStr = curDate.toISOString().slice(0, 10);
+      trendMap.set(dateStr, {
+        date: dateStr,
+        created: 0,
+        delivered: 0,
+        read: 0,
+        failed: 0,
+        pending: 0,
+        responses: 0,
+      });
+      curDate.setUTCDate(curDate.getUTCDate() + 1);
+    }
+
+    for (const log of currentLogs) {
+      const logDateStr = new Date(log.created_on).toISOString().slice(0, 10);
+      let bucket = trendMap.get(logDateStr);
+      if (!bucket) {
+        bucket = {
+          date: logDateStr,
+          created: 0,
+          delivered: 0,
+          read: 0,
+          failed: 0,
+          pending: 0,
+          responses: 0,
+        };
+        trendMap.set(logDateStr, bucket);
+      }
+      bucket.created++;
+      if (log.delivery_status === 'DELIVERED') {
+        bucket.delivered++;
+      } else if (log.delivery_status === 'READ') {
+        bucket.delivered++;
+        bucket.read++;
+      } else if (log.delivery_status === 'FAILED') {
+        bucket.failed++;
+      } else {
+        bucket.pending++;
+      }
+
+      if (log.testimonial_id || log.response_received_at) {
+        bucket.responses++;
+      }
+    }
+
+    const trend = Array.from(trendMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+
+    return {
+      period: {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        prevStartDate: prevStartDate.toISOString(),
+        prevEndDate: prevEndDate.toISOString(),
+        days,
+      },
+      summary: {
+        total_requests,
+        confirmed_delivered,
+        confirmed_read,
+        confirmed_failed,
+        pending_confirmation,
+        feedback_responses,
+        delivery_success_rate,
+        overall_delivery_rate,
+        response_rate_delivered,
+        response_rate_total,
+      },
+      comparison: {
+        prev_total_requests,
+        prev_confirmed_delivered,
+        prev_feedback_responses,
+        total_requests_change_pct,
+        delivered_change_pct,
+        responses_change_pct,
+      },
+      delivery_breakdown,
+      trend,
+      meta: {
+        channel: query.channel || 'WHATSAPP',
+        unknown_outcomes_count: pending_confirmation,
+        semantics: {
+          delivery_success_rate:
+            'Calculated strictly from verified terminal outcomes: (delivered + read) / (delivered + read + failed) * 100. Pending/in-flight dispatches are not treated as delivered or failed.',
+          response_rate_delivered:
+            'Ratio of customer testimonials submitted to confirmed delivered requests: feedback_responses / (delivered + read) * 100.',
+          pending_confirmation:
+            'Requests queued, sent to network, or in transit awaiting definitive webhook delivery receipts.',
+        },
+      },
     };
   }
 

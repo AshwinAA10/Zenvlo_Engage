@@ -20,6 +20,7 @@ import { BusinessService } from '../../Business/services/business.service';
 import {
   SubmitPublicTestimonialDto,
   UpdateTestimonialStatusDto,
+  BulkUpdateTestimonialsDto,
   TestimonialQueryDto,
 } from '../models/testimonial.dto';
 import { JwtAuthGuard } from '../../../guards/jwt-auth.guard';
@@ -76,6 +77,19 @@ export class TestimonialController {
   async GetAll(@Req() req: any, @Query() query: TestimonialQueryDto) {
     const businessId = req.user.business_id;
     return this.testimonialService.GetAll(businessId, query);
+  }
+
+  @Patch('bulk-status')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Batch approve or reject multiple testimonials' })
+  async BulkUpdateStatus(
+    @Req() req: any,
+    @Body() dto: BulkUpdateTestimonialsDto,
+  ) {
+    const businessId = req.user.business_id;
+    const userId = req.user.id || req.user.sub;
+    return this.testimonialService.BulkUpdateStatus(businessId, dto, userId);
   }
 
   @Get(':id')

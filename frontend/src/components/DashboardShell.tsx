@@ -122,6 +122,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <span className="text-[10px] text-muted-foreground font-mono truncate">
                   {displayedCategory}
                 </span>
+                {mounted && !business?.phone && (
+                  <Link
+                    href="/onboarding"
+                    className="text-[10px] text-[#10B981] font-semibold hover:underline flex items-center gap-1 mt-0.5"
+                  >
+                    Complete setup →
+                  </Link>
+                )}
               </div>
             </div>
           </div>
